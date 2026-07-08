@@ -1,0 +1,66 @@
+#!/bin/sh
+# S99book — 全本地统一 API 服务
+# 合并原 S99voice + S99mqtt 功能
+# 部署: /etc/init.d/S99book
+
+PID_FILE="/var/run/book_app.pid"
+APP_DIR="/userdata/book_app"
+APP_SCRIPT="app.py"
+APP_PORT=9777
+LOG_FILE="/var/log/book_app.log"
+
+start() {
+    echo "Starting book_app..."
+    if [ -f "$PID_FILE" ]; then
+        pid=$(cat "$PID_FILE")
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "book_app already running (pid=$pid)"
+            return 0
+        fi
+        rm -f "$PID_FILE"
+    fi
+
+    cd "$APP_DIR"
+    nohup python3 "$APP_SCRIPT" --port "$APP_PORT" --db "$APP_DIR/book.db" \
+        >> "$LOG_FILE" 2>&1 &
+    echo $! > "$PID_FILE"
+    echo "book_app started (pid=$!)"
+}
+
+stop() {
+    echo "Stopping book_app..."
+    if [ -f "$PID_FILE" ]; then
+        pid=$(cat "$PID_FILE")
+        if kill -0 "$pid" 2>/dev/null; then
+            kill "$pid"
+            sleep 2
+            if kill -0 "$pid" 2>/dev/null; then
+                kill -9 "$pid"
+            fi
+        fi
+        rm -f "$PID_FILE"
+    fi
+    # Also stop any lingering MQTT daemon
+    fuser -k /dev/ttyS4 2>/dev/null || true
+    fuser -k /dev/ttyS5 2>/dev/null || true
+}
+
+status() {
+    if [ -f "$PID_FILE" ]; then
+        pid=$(cat "$PID_FILE")
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "book_app running (pid=$pid)"
+            return 0
+        fi
+    fi
+    echo "book_app not running"
+    return 1
+}
+
+case "$1" in
+    start)   start ;;
+    stop)    stop ;;
+    restart) stop; sleep 1; start ;;
+    status)  status ;;
+    *)       echo "Usage: $0 {start|stop|restart|status}" ;;
+esac

@@ -1,0 +1,137 @@
+.title-bar { padding: 20rpx 24rpx; border-bottom: 1px solid #21262d; }
+.title-text { font-size: 34rpx; font-weight: 700; color: #f0f6fc; }
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.user-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background: #21262d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.avatar-emoji {
+  font-size: 40rpx;
+}
+
+.user-info {
+  flex: 1;
+}
+
+.user-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #f0f6fc;
+  margin-bottom: 4rpx;
+}
+.user-id {
+  font-size: 22rpx;
+  color: #484f58;
+  margin-bottom: 8rpx;
+}
+
+.user-meta {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.borrow-count {
+  font-size: 24rpx;
+  color: #8b949e;
+}
+.fine-alert {
+  display: block;
+  font-size: 26rpx;
+  color: #f85149;
+  font-weight: 500;
+  margin-top: 8rpx;
+  padding: 8rpx 16rpx;
+  background: #3a1a1a;
+  border-radius: 8rpx;
+  border: 1px solid #f85149;
+}
+
+/* Menu */
+.section {
+  margin-bottom: 24rpx;
+}
+
+.menu-list {
+  background: #161b22;
+  border-radius: 12rpx;
+  border: 1px solid #30363d;
+  overflow: hidden;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 24rpx;
+  border-bottom: 1px solid #21262d;
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-item:active {
+  background: #1c2333;
+}
+
+.menu-icon {
+  font-size: 32rpx;
+}
+
+.menu-text {
+  flex: 1;
+  font-size: 28rpx;
+  color: #c9d1d9;
+}
+
+/* Due badge */
+.due-badge {
+  font-size: 22rpx;
+}
+
+.due-badge.status-overdue {
+  color: #f85149;
+  font-weight: 600;
+}
+
+/* Logout */
+.logout-wrap {
+  margin-top: 40rpx;
+  padding-bottom: 40rpx;
+}
+
+/* Popup */
+.popup-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #f0f6fc;
+  text-align: center;
+  margin-bottom: 8rpx;
+}
+
+.popup-hint {
+  font-size: 24rpx;
+  color: #8b949e;
+  text-align: center;
+}
+
+.popup-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}

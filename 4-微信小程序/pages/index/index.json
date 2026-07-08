@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "智能机械臂图书库首页",
+  "navigationStyle": "custom", 
+  "usingComponents": {
+    "van-nav-bar": "@vant/weapp/nav-bar/index"
+  }
+}

@@ -1,0 +1,21 @@
+/dts-v1/;
+/plugin/;
+
+&uart3 {
+    status = "disabled";
+};
+
+&pdm {
+    status = "okay";
+    pinctrl-names = "default";
+    pinctrl-0 = <&pdmm2_clk1 &pdmm2_sdi3>;
+    rockchip,always-on;
+};
+
+&pdmics {
+    status = "okay";
+};
+
+&pdm_mic_array {
+    status = "okay";
+};

@@ -1,0 +1,82 @@
+.title-bar { padding: 20rpx 24rpx; border-bottom: 1px solid #21262d; }
+.title-text { font-size: 34rpx; font-weight: 700; color: #f0f6fc; }
+
+.action-cards {
+  margin-bottom: 24rpx;
+}
+
+.action-card {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 32rpx 24rpx;
+  border-radius: 16rpx;
+  margin-bottom: 16rpx;
+  border: 1px solid #30363d;
+  background: #161b22;
+}
+
+.action-card:active {
+  background: #1c2333;
+}
+
+.action-icon {
+  font-size: 48rpx;
+  flex-shrink: 0;
+}
+
+.action-content {
+  flex: 1;
+}
+
+.action-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #f0f6fc;
+  margin-bottom: 6rpx;
+}
+
+.action-desc {
+  font-size: 24rpx;
+  color: #8b949e;
+  line-height: 1.4;
+}
+
+.borrow-card { border-left: 4rpx solid #58a6ff; }
+.return-card { border-left: 4rpx solid #3fb950; }
+
+.due-text {
+  color: #8b949e;
+}
+
+.due-text.status-overdue {
+  color: #f85149;
+  font-weight: 600;
+}
+
+.flow-hint {
+  margin-top: 32rpx;
+  padding: 24rpx;
+  background: #161b22;
+  border-radius: 12rpx;
+  border: 1px solid #21262d;
+}
+
+.flow-title {
+  font-size: 26rpx;
+  color: #8b949e;
+  margin-bottom: 12rpx;
+  font-weight: 600;
+}
+
+.flow-step {
+  font-size: 24rpx;
+  color: #484f58;
+  padding: 6rpx 0;
+  padding-left: 16rpx;
+  border-left: 2rpx solid #30363d;
+}
+
+.flow-step::before {
+  content: '';
+}

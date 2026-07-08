@@ -1,0 +1,71 @@
+<van-nav-bar title="书本操作" left-text="返回" left-arrow fixed placeholder z-index="100" />
+
+<view class="page-container">
+  <!-- Scan input -->
+  <view class="scan-section">
+    <van-button icon="scan" type="primary" block bind:click="onScanCode">扫描二维码</van-button>
+    <view class="or-divider"><text>或</text></view>
+    <van-field
+      value="{{ instanceId }}"
+      placeholder="输入书本编号"
+      border="{{ true }}"
+      bind:confirm="onInputConfirm"
+    />
+  </view>
+
+  <!-- Book info -->
+  <view class="book-card" wx:if="{{ instance }}">
+    <view class="card-header">
+      <van-tag type="{{ instance.status === 3 ? 'success' : instance.status === 1 ? 'warning' : 'primary' }}" size="medium">
+        {{ statusText(instance.status) }}
+      </van-tag>
+      <text class="instance-id">#{{ instance.instance_id }}</text>
+    </view>
+
+    <view class="card-body" wx:if="{{ instance }}">
+      <view class="info-row">
+        <text class="label">状态</text>
+        <text>{{ statusText(instance.status) }}</text>
+      </view>
+      <view class="info-row" wx:if="{{ instance.borrower_id }}">
+        <text class="label">借阅人ID</text>
+        <text>{{ instance.borrower_id }}</text>
+      </view>
+      <view class="info-row" wx:if="{{ instance.borrow_time }}">
+        <text class="label">借出时间</text>
+        <text>{{ instance.borrow_time }}</text>
+      </view>
+      <view class="info-row" wx:if="{{ instance.return_time }}">
+        <text class="label">归还时间</text>
+        <text>{{ instance.return_time }}</text>
+      </view>
+    </view>
+
+    <!-- Action button -->
+    <view class="card-action">
+      <van-button wx:if="{{ action === 'borrow' }}" icon="bookmark-o" type="success" block bind:click="doBorrow">
+        借书（机械爪推出后取走）
+      </van-button>
+      <van-button wx:if="{{ action === 'return' }}" icon="exchange" type="primary" block bind:click="doReturn">
+        还书（确认归还）
+      </van-button>
+      <van-button wx:if="{{ action === 'retrieve' }}" icon="logistics" type="warning" block bind:click="doRetrieve">
+        取书（机械爪推出）
+      </van-button>
+      <van-button wx:if="{{ action === 're-shelve' }}" icon="add-o" type="success" block bind:click="doReShelve">
+        重新上架（机械爪推入）
+      </van-button>
+      <van-button wx:if="{{ action === 'view' }}" icon="info-o" type="default" block disabled>
+        {{ instance.status === 1 ? '该书已被他人借出' : '当前状态不可操作' }}
+      </van-button>
+    </view>
+  </view>
+
+  <!-- Empty state -->
+  <view class="empty-state" wx:if="{{ !instance && !loading }}">
+    <van-icon name="scan" size="48px" color="#dcdee0" />
+    <text class="empty-text">扫描书本二维码或输入编号</text>
+  </view>
+</view>
+
+<van-toast id="van-toast" />

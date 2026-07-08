@@ -1,0 +1,46 @@
+<view class="title-bar"><text class="title-text">书本详情</text></view>
+
+<view class="page-container" wx:if="{{ !loading }}">
+  <!-- 有实例 -->
+  <block wx:if="{{ instance }}">
+    <view class="card">
+      <view class="book-title">{{ instance.title || '未知书名' }}</view>
+      <view class="book-meta">{{ instance.category || '' }}</view>
+      <view class="status-row">
+        <view class="status-tag {{ statusClass(instance.status) }}">{{ statusText(instance.status) }}</view>
+        <view wx:if="{{ isOverdue }}" class="status-tag status-overdue">已逾期</view>
+      </view>
+      <view class="info-row" wx:if="{{ instance.status === 3 }}">
+        <text class="info-label">位置</text><text class="info-value">槽位 #{{ instance.slot_id }}</text>
+      </view>
+      <view class="info-row" wx:if="{{ instance.borrow_time }}">
+        <text class="info-label">借出</text><text class="info-value">{{ instance.borrow_time }}</text>
+      </view>
+      <view class="info-row" wx:if="{{ instance.due_date }}">
+        <text class="info-label">应还</text><text class="info-value {{ isOverdue ? 'text-danger' : '' }}">{{ instance.due_date }}</text>
+      </view>
+    </view>
+    <view class="action-buttons">
+      <van-button wx:if="{{ showBorrow }}" type="primary" block round size="large" bind:click="onBorrow">📖 借这本书</van-button>
+      <van-button wx:if="{{ showReturn }}" type="warning" block round size="large" bind:click="onReturn">📥 归还此书</van-button>
+      <view wx:if="{{ !showBorrow && !showReturn }}" class="no-action-hint">
+        <text>{{ instance.status === 1 ? '该书已被借出' : '该书暂不可操作' }}</text>
+      </view>
+    </view>
+  </block>
+
+  <!-- 仅 bookInfo -->
+  <block wx:elif="{{ bookInfo }}">
+    <view class="card">
+      <view class="book-title">{{ bookInfo.title }}</view>
+      <view class="book-meta">{{ bookInfo.category }}</view>
+      <view class="status-row"><view class="status-tag status-pending">未上架</view></view>
+      <view class="info-row"><text class="info-label">状态</text><text class="info-value" style="color:#8b949e;">该书当前不在书架上</text></view>
+    </view>
+  </block>
+
+  <view wx:else class="empty-state"><text>加载失败</text></view>
+</view>
+
+<view wx:if="{{ loading }}" class="empty-state"><text>加载中...</text></view>
+<van-toast id="van-toast" />

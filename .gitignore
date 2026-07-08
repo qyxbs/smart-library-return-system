@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (mini program)
+node_modules/
+miniprogram_npm/
+package-lock.json
+
+# Large binary files
+*.img
+*.bin
+*.gguf
+*.wav
+*.zip
+*.tar.gz
+*.7z
+*.itb
+
+# Logs
+*.log
+
+# Environment/config (may contain secrets)
+*.env
+*.cfg
+
+# Project internal (not for open source)
+CLAUDE.md
+.claude/

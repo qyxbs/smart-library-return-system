@@ -1,0 +1,96 @@
+.page-container {
+  padding: 15px;
+  background-color: #f7f8fa;
+  min-height: 100vh;
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #f5f5f5;
+  margin-right: 14px;
+}
+
+.nickname {
+  font-size: 17px;
+  font-weight: bold;
+  color: #323233;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #323233;
+  margin-bottom: 10px;
+  padding-left: 4px;
+}
+
+.book-list {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  margin-bottom: 20px;
+}
+
+.book-item {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.book-item:last-child {
+  border-bottom: none;
+}
+
+.book-item:active {
+  background-color: #f7f8fa;
+}
+
+.book-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #323233;
+  margin-bottom: 4px;
+}
+
+.book-meta {
+  font-size: 12px;
+  color: #969799;
+}
+
+.empty {
+  text-align: center;
+  padding: 30px;
+  color: #c8c9cc;
+  font-size: 14px;
+}
+
+.logout-wrap {
+  margin-top: 30px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 80px;
+}
+
+.empty-text {
+  color: #c8c9cc;
+  font-size: 15px;
+  margin: 16px 0;
+}

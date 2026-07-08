@@ -1,0 +1,140 @@
+<view class="title-bar"><text class="title-text">管理面板</text></view>
+
+<view class="page-container" wx:if="{{ pinVerified }}">
+  <!-- Tab 切换 -->
+  <view class="tab-bar">
+    <view class="tab-item {{ activeTab === 'users' ? 'active' : '' }}"
+          data-tab="users" bind:tap="onTabChange">用户</view>
+    <view class="tab-item {{ activeTab === 'logs' ? 'active' : '' }}"
+          data-tab="logs" bind:tap="onTabChange">日志</view>
+    <view class="tab-item {{ activeTab === 'tasks' ? 'active' : '' }}"
+          data-tab="tasks" bind:tap="onTabChange">任务</view>
+    <view class="tab-item {{ activeTab === 'system' ? 'active' : '' }}"
+          data-tab="system" bind:tap="onTabChange">系统</view>
+  </view>
+
+  <!-- === 用户管理 === -->
+  <view wx:if="{{ activeTab === 'users' }}">
+    <view class="card-header">用户列表 ({{ userTotal }})</view>
+    <view class="user-item" wx:for="{{ users }}" wx:key="user_id">
+      <view class="user-item-left">
+        <view class="user-item-name">{{ item.nickname || '未命名' }}</view>
+        <view class="user-item-meta">
+          ID: {{ item.user_id }} ·
+          <text class="{{ item.role === 1 ? 'text-admin' : '' }}">
+            {{ item.role === 1 ? '管理员' : '用户' }}
+          </text>
+          <text wx:if="{{ item.is_frozen }}" class="text-danger"> · 已冻结</text>
+        </view>
+      </view>
+      <view class="user-actions">
+        <van-button size="small" type="{{ item.is_frozen ? 'info' : 'danger' }}"
+          data-id="{{ item.user_id }}" data-frozen="{{ item.is_frozen }}"
+          bind:click="onFreezeUser">{{ item.is_frozen ? '解冻' : '冻结' }}</van-button>
+        <van-button wx:if="{{ item.role !== 1 }}" size="small" type="primary"
+          data-id="{{ item.user_id }}" bind:click="onPromoteUser">升管理</van-button>
+        <van-button wx:if="{{ item.role === 1 }}" size="small" type="warning"
+          data-id="{{ item.user_id }}" bind:click="onDemoteUser">降级</van-button>
+      </view>
+    </view>
+  </view>
+
+  <!-- === 操作日志 === -->
+  <view wx:if="{{ activeTab === 'logs' }}">
+    <view class="card-header">操作日志 ({{ logTotal }})</view>
+    <view class="log-item" wx:for="{{ logs }}" wx:key="log_id">
+      <view class="log-action">
+        <view class="status-tag status-pending">{{ getActionText(item.action_type) }}</view>
+      </view>
+      <view class="log-content">{{ item.content }}</view>
+      <view class="log-time">{{ item.create_time }}</view>
+    </view>
+    <view wx:if="{{ logs.length === 0 }}" class="empty-state">
+      <text>暂无日志</text>
+    </view>
+  </view>
+
+  <!-- === 任务监控 === -->
+  <view wx:if="{{ activeTab === 'tasks' }}">
+    <view class="card-header">机械爪任务队列</view>
+    <view class="card" wx:if="{{ taskQueue }}">
+      <view class="flex-between">
+        <text>待执行</text>
+        <text class="text-primary">{{ taskQueue.pending }} 个</text>
+      </view>
+      <view class="flex-between" wx:if="{{ taskQueue.current }}">
+        <text>当前执行</text>
+        <text>{{ taskQueue.current.action }} @ {{ taskQueue.current.coord_y }}</text>
+      </view>
+    </view>
+
+    <view class="card-header" style="margin-top:24rpx;">QR 任务列表</view>
+    <view class="log-item" wx:for="{{ tasks }}" wx:key="task_id">
+      <view class="flex-between">
+        <view class="status-tag {{ item.status === 'done' ? 'status-on-shelf' : item.status === 'failed' ? 'status-overdue' : 'status-pending' }}">
+          {{ item.action }} · {{ item.status }}
+        </view>
+        <text class="log-time">{{ item.created_at }}</text>
+      </view>
+      <view class="log-content" style="font-size:22rpx; color:#8b949e;">
+        task_id: {{ item.task_id }}
+      </view>
+    </view>
+  </view>
+
+  <!-- === 系统状态 === -->
+  <view wx:if="{{ activeTab === 'system' }}">
+    <view class="card">
+      <view class="flex-between">
+        <text>设备状态</text>
+        <view class="status-dot {{ deviceOnline ? 'online' : 'offline' }}"></view>
+      </view>
+      <view class="flex-between" style="margin-top:12rpx;">
+        <text>RK3566</text>
+        <text class="text-muted">192.168.106.26:9777</text>
+      </view>
+      <view class="flex-between" style="margin-top:12rpx;">
+        <text>数据库</text>
+        <text class="text-muted">SQLite</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="refresh-btn" bind:tap="onRefresh">
+    <text>🔄 刷新</text>
+  </view>
+</view>
+
+<!-- PIN 验证 -->
+<view class="page-container" wx:if="{{ !pinVerified }}">
+  <view class="empty-state" style="padding-top:120rpx;">
+    <text style="font-size:48rpx;">🔐</text>
+    <text style="margin-top:24rpx;">需要管理员 PIN 码验证</text>
+    <van-field
+      value="{{ pinInput }}"
+      type="password"
+      placeholder="请输入 PIN 码"
+      border="{{ true }}"
+      bind:change="onPinInput"
+      custom-style="width:100%; margin-top:24rpx;"
+    />
+    <van-button type="primary" round loading="{{ verifying }}"
+                bind:click="onPinVerify" style="margin-top:24rpx;">
+      验证
+    </van-button>
+  </view>
+</view>
+
+<!-- 升降权限 PIN 弹窗 -->
+<van-popup show="{{ showActionPopup }}" position="center" custom-style="width:80%; border-radius:16rpx; background:#161b22; padding:40rpx;">
+  <view class="popup-title">{{ actionType === 'promote' ? '提升为管理员' : '降级为普通用户' }}</view>
+  <view class="popup-hint">用户: {{ actionUserName }} · 请输入 PIN 码确认</view>
+  <van-field value="{{ actionPin }}" type="password" placeholder="PIN 码" border="{{ true }}"
+    bind:change="onActionPinInput" custom-style="background:#0d1117; margin:24rpx 0;" />
+  <view class="popup-buttons">
+    <van-button type="default" size="small" bind:click="onActionCancel">取消</van-button>
+    <van-button type="primary" size="small" loading="{{ actionLoading }}" bind:click="onActionConfirm">确认</van-button>
+  </view>
+</van-popup>
+
+<van-toast id="van-toast" />

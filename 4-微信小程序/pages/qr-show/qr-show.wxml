@@ -1,0 +1,43 @@
+<view class="page-container">
+  <!-- Return: step reminder -->
+  <view wx:if="{{ action === 'return' && status === 'waiting' }}" class="return-guide">
+    <view class="guide-title">📥 还书步骤</view>
+    <view class="guide-step done">① 先将书本放入整书区</view>
+    <view class="guide-step active">② 将二维码对准摄像头</view>
+    <view class="guide-step">③ 系统自动扫描归位</view>
+  </view>
+
+  <view class="status-section">
+    <view class="status-icon">{{ status === 'loading' ? '⏳' : status === 'waiting' ? '📷' : status === 'processing' ? '⚙️' : status === 'done' ? '✅' : '❌' }}</view>
+    <view class="status-text {{ status }}">{{ statusText }}</view>
+    <view wx:if="{{ timerText && status === 'waiting' }}" class="timer">剩余: {{ timerText }}</view>
+  </view>
+
+  <view class="qr-section" wx:if="{{ status !== 'loading' && status !== 'failed' && status !== 'expired' }}">
+    <image class="qr-img" src="{{ qrUrl }}" mode="aspectFit" wx:if="{{ qrUrl }}" />
+    <view class="task-info">
+      <text class="task-action">{{ action === 'borrow' ? '📖 借书' : '📥 还书' }}</text>
+      <text class="task-detail" wx:if="{{ title }}">《{{ title }}》</text>
+    </view>
+    <view wx:if="{{ status === 'processing' }}" class="progress-dots">
+      <view class="dot" /><view class="dot" /><view class="dot" />
+    </view>
+  </view>
+
+  <view class="done-section" wx:if="{{ status === 'done' }}">
+    <text class="done-text">✅ 完成</text>
+    <van-button type="primary" round bind:tap="goBack">返回</van-button>
+  </view>
+
+  <view class="fail-section" wx:if="{{ status === 'failed' || status === 'expired' }}">
+    <text class="fail-text">❌ 已过期</text>
+    <van-button type="primary" round bind:tap="onRetry">重试</van-button>
+  </view>
+
+  <view wx:if="{{ status === 'waiting' && action === 'borrow' }}" class="hint-text">
+    💡 屏幕调最亮，二维码正对摄像头
+  </view>
+  <view wx:if="{{ status === 'waiting' && action === 'return' }}" class="hint-text">
+    ⚠️ 确认书本已放入整书区后再扫码
+  </view>
+</view>

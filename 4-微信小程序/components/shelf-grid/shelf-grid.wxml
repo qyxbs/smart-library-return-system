@@ -1,0 +1,27 @@
+<view class="shelf-grid">
+  <!-- 二层 -->
+  <view class="layer-label">二层</view>
+  <view class="slot-row">
+    <block wx:for="{{ layer2Slots }}" wx:key="slot_id">
+      <view class="slot-box {{ item.is_occupied ? 'occupied' : 'empty' }}"
+            data-slot-id="{{ item.slot_id }}" bind:tap="onSlotTap">
+        <text class="slot-title" wx:if="{{ item.bookTitle }}">{{ item.bookTitle }}</text>
+        <text class="slot-placeholder" wx:else>{{ item.remark }}</text>
+        <text class="slot-remark">{{ item.remark }}</text>
+      </view>
+    </block>
+  </view>
+
+  <!-- 一层 -->
+  <view class="layer-label">一层</view>
+  <view class="slot-row">
+    <block wx:for="{{ layer1Slots }}" wx:key="slot_id">
+      <view class="slot-box {{ item.is_occupied ? 'occupied' : 'empty' }}"
+            data-slot-id="{{ item.slot_id }}" bind:tap="onSlotTap">
+        <text class="slot-title" wx:if="{{ item.bookTitle }}">{{ item.bookTitle }}</text>
+        <text class="slot-placeholder" wx:else>{{ item.remark }}</text>
+        <text class="slot-remark">{{ item.remark }}</text>
+      </view>
+    </block>
+  </view>
+</view>

@@ -1,0 +1,60 @@
+.page-container {
+  padding: 15px;
+  background-color: #f7f8fa;
+  min-height: 100vh;
+}
+
+.search-bar {
+  margin-bottom: 16px;
+}
+
+.section {
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #323233;
+  margin-bottom: 10px;
+  padding-left: 4px;
+}
+
+.book-list {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.book-item {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.book-item:last-child {
+  border-bottom: none;
+}
+
+.book-item:active {
+  background-color: #f7f8fa;
+}
+
+.book-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #323233;
+  margin-bottom: 4px;
+}
+
+.book-meta {
+  font-size: 12px;
+  color: #969799;
+}
+
+.empty {
+  text-align: center;
+  padding: 40px;
+  color: #c8c9cc;
+  font-size: 14px;
+}

@@ -1,0 +1,50 @@
+<van-nav-bar title="智能书架" fixed placeholder z-index="100" />
+
+<view class="page-container">
+  <view class="status-bar">
+    <van-tag round type="{{ deviceOnline ? 'success' : 'danger' }}" size="medium">
+      {{ deviceOnline ? '设备在线' : '设备离线' }}
+    </van-tag>
+    <text class="status-hint">RK3566 · 16槽位</text>
+  </view>
+
+  <view class="action-bar">
+    <van-button wx:if="{{ isAdmin }}" icon="plus" type="primary" size="small" bind:click="goEntry">录入</van-button>
+    <van-button icon="scan" type="info" size="small" bind:click="goScan">扫码</van-button>
+    <van-button icon="search" size="small" bind:click="goSearch">搜索</van-button>
+    <van-button wx:if="{{ isAdmin }}" icon="orders-o" size="small" bind:click="goLogs">日志</van-button>
+  </view>
+
+  <view class="shelf-grid">
+    <view class="layer-label">二层 · 科技艺术 & 人文社科</view>
+    <view class="slot-row">
+      <block wx:for="{{ slots }}" wx:key="slot_id" wx:if="{{ item.coord_x === 2 }}">
+        <view class="slot-box {{ item.is_occupied ? 'occupied' : 'empty' }}"
+              data-slot="{{ item }}" bind:tap="onSlotTap">
+          <text class="slot-remark">{{ item.remark }}</text>
+          <text class="slot-title" wx:if="{{ item.bookTitle }}">{{ item.bookTitle }}</text>
+          <text class="slot-empty" wx:else>空</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="layer-label">一层 · 文学休闲 & 少儿教辅</view>
+    <view class="slot-row">
+      <block wx:for="{{ slots }}" wx:key="slot_id" wx:if="{{ item.coord_x === 1 }}">
+        <view class="slot-box {{ item.is_occupied ? 'occupied' : 'empty' }}"
+              data-slot="{{ item }}" bind:tap="onSlotTap">
+          <text class="slot-remark">{{ item.remark }}</text>
+          <text class="slot-title" wx:if="{{ item.bookTitle }}">{{ item.bookTitle }}</text>
+          <text class="slot-empty" wx:else>空</text>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="legend">
+    <view class="legend-item"><view class="dot green"></view><text>有书(点击查看)</text></view>
+    <view class="legend-item"><view class="dot gray"></view><text>空闲</text></view>
+  </view>
+</view>
+
+<van-toast id="van-toast" />

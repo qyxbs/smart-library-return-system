@@ -1,0 +1,56 @@
+#!/bin/sh
+# S99voice - 语音 AI 服务 (云端 DeepSeek 链)
+# :8890 HTTPS — 声纹验证 + 语音书名识别 + 声纹注册
+
+PIDFILE=/var/run/voice_app.pid
+LOG=/tmp/voice_app.log
+APP_DIR=/userdata/voice_app
+PYTHON=/userdata/python/bin/python3
+
+export SERPER_API_KEY="a81976e654537d20d473f4be1fe46dfc9ed5bff5"
+export ORT_DISABLE_ARENA=1
+
+start() {
+    echo "[S99voice] Starting at $(date)" >> /tmp/voice_boot.log 2>/dev/null
+
+    # 等待关键路径就绪
+    for i in 1 2 3 4 5; do
+        [ -d /tmp ] && [ -x $PYTHON ] && [ -f $APP_DIR/voice_web_app.py ] && break
+        echo "[S99voice] Waiting for deps (attempt $i)..." >> /tmp/voice_boot.log 2>/dev/null
+        sleep 2
+    done
+
+    if [ -f $PIDFILE ] && kill -0 $(cat $PIDFILE) 2>/dev/null; then
+        echo "[S99voice] Already running (PID $(cat $PIDFILE))" >> /tmp/voice_boot.log 2>/dev/null
+        exit 0
+    fi
+
+    cd $APP_DIR
+    nohup $PYTHON voice_web_app.py > $LOG 2>&1 &
+    echo $! > $PIDFILE
+    echo "[S99voice] Started PID=$(cat $PIDFILE)" >> /tmp/voice_boot.log 2>/dev/null
+}
+
+stop() {
+    if [ -f $PIDFILE ]; then
+        kill $(cat $PIDFILE) 2>/dev/null
+        rm -f $PIDFILE
+        echo "[S99voice] Stopped"
+    fi
+}
+
+status() {
+    if [ -f $PIDFILE ] && kill -0 $(cat $PIDFILE) 2>/dev/null; then
+        echo "Voice running (PID $(cat $PIDFILE))"
+    else
+        echo "Voice NOT running"
+    fi
+}
+
+case "$1" in
+    start)   start ;;
+    stop)    stop ;;
+    status)  status ;;
+    restart) stop; sleep 1; start ;;
+    *)       echo "Usage: $0 {start|stop|status|restart}" ;;
+esac

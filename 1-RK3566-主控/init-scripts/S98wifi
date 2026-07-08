@@ -1,0 +1,108 @@
+#!/bin/sh
+# S98wifi — Single WiFi STA (simple, stable)
+# Good dongle only: 90:de:80:1a:76:9c
+# Connects to phone hotspot abcd (5GHz)
+
+SSID=abcd
+PSK=123454321
+KO=/opt/amp/88x2bu.ko
+
+log() { echo "[wifi] $(date +%H:%M:%S) $*"; }
+
+case "$1" in
+  start)
+    log "=== Single STA starting ==="
+
+    # Watchdog first
+    if [ -c /dev/watchdog ]; then
+        killall watchdog 2>/dev/null; sleep 0.2
+        watchdog -T 60 -t 30 /dev/watchdog 2>/dev/null &
+        log "Watchdog: PID $!"
+    fi
+
+    # Fix udhcpc script
+    cat > /usr/share/udhcpc/default.script << 'X'
+#!/bin/sh
+[ -z "$1" ] && exit 0
+case "$1" in
+    deconfig) ip addr flush dev $interface 2>/dev/null ;;
+    renew|bound)
+        ip addr add $ip/$mask dev $interface 2>/dev/null
+        for r in $router; do ip route replace default via $r dev $interface 2>/dev/null; done
+        [ -n "$dns" ] && echo "nameserver $dns" > /etc/resolv.conf
+        ;;
+esac
+X
+    chmod +x /usr/share/udhcpc/default.script
+
+    # Wait for USB
+    log "Wait 10s for USB..."
+    sleep 10
+
+    # Load driver
+    if ! [ -d /sys/class/net/wlan0 ]; then
+        log "Loading driver..."
+        insmod $KO 2>/dev/null
+        sleep 3
+    fi
+
+    # Wait for wlan0
+    for i in $(seq 1 20); do
+        [ -d /sys/class/net/wlan0 ] && break
+        sleep 0.5
+    done
+
+    if ! [ -d /sys/class/net/wlan0 ]; then
+        log "ERROR: wlan0 not found"
+        exit 1
+    fi
+
+    MAC=$(cat /sys/class/net/wlan0/address)
+    log "wlan0: $MAC"
+
+    # Connect to hotspot
+    ip link set wlan0 up
+    wpa_passphrase "$SSID" "$PSK" > /tmp/wpa.conf
+    wpa_supplicant -i wlan0 -c /tmp/wpa.conf -B
+    log "wpa_supplicant started"
+
+    # Wait for connection
+    for i in $(seq 1 15); do
+        sleep 1
+        iw dev wlan0 link 2>/dev/null | grep -q "Connected" && break
+    done
+
+    if iw dev wlan0 link 2>/dev/null | grep -q "Connected"; then
+        log "Connected to $SSID"
+    else
+        log "WARNING: not connected yet"
+    fi
+
+    # DHCP
+    killall udhcpc 2>/dev/null; sleep 0.3
+    udhcpc -i wlan0 -b -p /var/run/udhcpc.pid 2>/dev/null &
+    sleep 2
+    IP=$(ip -4 addr show wlan0 2>/dev/null | grep inet | awk '{print $2}')
+    log "IP: ${IP:-none}"
+
+    ping -c 1 -W 3 8.8.8.8 > /dev/null 2>&1 && log "Internet: OK"
+
+    # Disable old monitor
+    killall wifi_monitor.sh 2>/dev/null
+    log "=== Ready ==="
+    ;;
+
+  stop)
+    killall wpa_supplicant udhcpc watchdog 2>/dev/null
+    ip link set wlan0 down 2>/dev/null
+    ;;
+
+  status)
+    echo "wlan0: $(cat /sys/class/net/wlan0/address 2>/dev/null)"
+    iw dev wlan0 info 2>/dev/null | grep -E "ssid|type|channel|txpower"
+    iw dev wlan0 link 2>/dev/null | head -3
+    ip -4 addr show wlan0 2>/dev/null | grep inet
+    ;;
+
+  *) echo "Usage: $0 {start|stop|status}" ;;
+esac

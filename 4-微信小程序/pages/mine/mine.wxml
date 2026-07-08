@@ -1,0 +1,40 @@
+<van-nav-bar title="个人中心" fixed placeholder />
+
+<view class="page-container">
+  <block wx:if="{{ userInfo }}">
+    <view class="user-card">
+      <image class="avatar" src="{{ userInfo.avatarUrl || '/image/hole.png' }}" mode="aspectFill" />
+      <view class="user-info">
+        <text class="nickname">{{ userInfo.nickname || '未设置昵称' }}</text>
+        <van-tag type="{{ isAdmin ? 'warning' : 'primary' }}" size="medium">
+          {{ isAdmin ? '管理员' : '普通用户' }}
+        </van-tag>
+      </view>
+    </view>
+
+    <view class="section-title">我的借阅 ({{ borrowedBooks.length }}本)</view>
+    <view class="book-list" wx:if="{{ borrowedBooks.length > 0 }}">
+      <view class="book-item" wx:for="{{ borrowedBooks }}" wx:key="instance_id" data-id="{{ item.instance_id }}" bind:tap="onBookTap">
+        <view class="book-title">{{ item.title }}</view>
+        <view class="book-meta">借出: {{ item.borrow_time }}</view>
+      </view>
+    </view>
+    <view class="empty" wx:else>
+      <text>还没有借阅记录</text>
+    </view>
+
+    <view class="logout-wrap">
+      <van-button type="danger" block round bind:click="onLogout">退出登录</van-button>
+    </view>
+  </block>
+
+  <block wx:else>
+    <view class="empty-state">
+      <van-icon name="user-o" size="64px" color="#ccc" />
+      <text class="empty-text">尚未登录</text>
+      <van-button type="primary" round bind:click="onLogin">微信一键登录</van-button>
+    </view>
+  </block>
+</view>
+
+<van-toast id="van-toast" />

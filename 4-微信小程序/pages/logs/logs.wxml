@@ -1,0 +1,22 @@
+<van-nav-bar title="操作日志" left-text="返回" left-arrow fixed placeholder z-index="100" />
+
+<view class="page-container">
+  <view class="log-list">
+    <view class="log-item" wx:for="{{ logs }}" wx:key="log_id">
+      <view class="log-header">
+        <van-tag type="primary" size="medium">{{ actionText(item.action_type) }}</van-tag>
+        <text class="log-time">{{ item.create_time }}</text>
+      </view>
+      <view class="log-content">{{ item.content }}</view>
+      <view class="log-operator" wx:if="{{ item.operator_name }}">操作人: {{ item.operator_name }}</view>
+    </view>
+
+    <view class="empty" wx:if="{{ logs.length === 0 && !loading }}">
+      <text>暂无操作记录</text>
+    </view>
+
+    <view class="loading" wx:if="{{ loading }}">
+      <text>加载中...</text>
+    </view>
+  </view>
+</view>

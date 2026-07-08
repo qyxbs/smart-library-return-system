@@ -1,0 +1,64 @@
+<view class="title-bar"><text class="title-text">借还</text></view>
+
+<view class="page-container">
+  <!-- 两个大操作卡片 -->
+  <view class="action-cards">
+    <view class="action-card borrow-card" bind:tap="onBorrowBook">
+      <view class="action-icon">📖</view>
+      <view class="action-content">
+        <view class="action-title">我要借书</view>
+        <view class="action-desc">搜索或浏览书架，选择要借的书</view>
+      </view>
+      <van-icon name="arrow" size="18px" color="#58a6ff" />
+    </view>
+
+    <view class="action-card return-card" bind:tap="onReturnBooks">
+      <view class="action-icon">📥</view>
+      <view class="action-content">
+        <view class="action-title">我要还书</view>
+        <view class="action-desc">
+          ① 先将书本放入整书区  ② 再扫码启动归还
+        </view>
+      </view>
+      <van-icon name="arrow" size="18px" color="#3fb950" />
+    </view>
+  </view>
+
+  <!-- 当前借阅列表 -->
+  <view class="card" wx:if="{{ borrowed.length > 0 }}">
+    <view class="card-header">当前借阅 ({{ borrowed.length }}本)</view>
+    <view class="book-item" wx:for="{{ borrowed }}" wx:key="instance_id">
+      <view class="book-item-content">
+        <view class="book-item-title">{{ item.title }}</view>
+        <view class="book-item-meta">
+          借出: {{ item.borrow_time }}
+          <text class="due-text {{ getDueStatus(item.due_date) }}">
+            · {{ getDueText(item.due_date) }}
+          </text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view wx:if="{{ borrowed.length === 0 && !loading }}" class="card">
+    <view class="empty-state">
+      <text>📚</text>
+      <text>还没有借阅记录</text>
+      <text style="font-size:24rpx;color:#484f58;margin-top:8rpx;">
+        去书架选一本感兴趣的书吧
+      </text>
+    </view>
+  </view>
+
+  <!-- 流程说明 -->
+  <view class="flow-hint">
+    <view class="flow-title">使用流程</view>
+    <view class="flow-step">1. 选择要借/还的书</view>
+    <view class="flow-step">2. 生成任务二维码</view>
+    <view class="flow-step">3. 出示二维码给书架摄像头</view>
+    <view class="flow-step">4. 机械爪自动取书/还书</view>
+  </view>
+</view>
+
+<van-toast id="van-toast" />

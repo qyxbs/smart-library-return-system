@@ -1,0 +1,30 @@
+<!-- compact title bar -->
+<view class="title-bar">
+  <text class="title-text">智能书架</text>
+  <view class="title-actions">
+    <van-icon name="search" size="18px" bind:click="onGoSearch" />
+    <van-icon name="replay" size="18px" bind:click="onRefresh" />
+  </view>
+</view>
+
+<view class="page-container">
+  <!-- 设备状态 -->
+  <view class="status-bar">
+    <view class="status-dot {{ deviceOnline ? 'online' : 'offline' }}"></view>
+    <text class="status-text">{{ deviceOnline ? '设备在线' : '设备离线' }}</text>
+    <text class="status-hint">· 16格书架</text>
+  </view>
+
+  <!-- 书架网格 -->
+  <view wx:if="{{ !loading }}">
+    <shelf-grid slots="{{ slots }}" bind:tap="onSlotTap" />
+
+  </view>
+
+  <!-- 加载中 -->
+  <view wx:if="{{ loading }}" class="empty-state">
+    <text>加载中...</text>
+  </view>
+</view>
+
+<van-toast id="van-toast" />

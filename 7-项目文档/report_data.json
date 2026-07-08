@@ -1,0 +1,631 @@
+[
+  {
+    "type": "empty"
+  },
+  {
+    "type": "empty"
+  },
+  {
+    "type": "empty"
+  },
+  {
+    "type": "empty"
+  },
+  {
+    "type": "empty"
+  },
+  {
+    "type": "empty"
+  },
+  {
+    "type": "title",
+    "text": "智能图书自动归位系统",
+    "size": 48
+  },
+  {
+    "type": "title",
+    "text": "基于RT-Thread的边端协同智能图书归位系统",
+    "size": 32
+  },
+  {
+    "type": "empty"
+  },
+  {
+    "type": "title",
+    "text": "技术报告",
+    "size": 36
+  },
+  {
+    "type": "empty"
+  },
+  {
+    "type": "empty"
+  },
+  {
+    "type": "title",
+    "text": "2026年7月",
+    "size": 28
+  },
+  {
+    "type": "page_break"
+  },
+  {
+    "type": "heading",
+    "text": "摘  要",
+    "level": 1
+  },
+  {
+    "type": "para",
+    "text": "针对小型图书馆人力匮乏、错架率高、借还效率低的行业痛点，本文设计并实现了一套基于RT-Thread生态的边端协同智能图书自动归位系统。系统采用RK3566（Cortex-A55×4, Linux）+K230×2（RISC-V双核, RT-Smart）+STM32（Cortex-M4, RT-Thread标准版）三芯异构架构，通过TCP文本行协议与CRC-4/ITU校验实现跨芯片松耦合通信。感知层以OV5695 MIPI摄像头与K230视觉平台为核心，实现QR码识别与AprilTag 25h9视觉基准标记的单目位姿估计，PID闭环伺服控制机械爪实现毫米级定位；交互层集成SenseVoice-Small端侧语音识别（RTF≈0.6）与ERes2Net声纹验证（512维嵌入），设计DeepSeek v4-pro云端推理与Qwen3-0.6B本地推理双引擎架构，网络正常时优先云端大模型，断网时自动切换至端侧LoRA微调模型（379MB Q4_K_M GGUF），保障离线环境核心功能不中断。系统提出有限状态机驱动的统一任务调度框架与多级语音容错管线，实现借还全流程自动化执行。经联调验证，边端协同架构下各子系统协同稳定运行，AprilTag视觉闭环伺服可有效消除机械累积误差，文本行+CRC4校验协议与投票机制保障了扫码识别与跨芯片通信的可靠性。"
+  },
+  {
+    "type": "para",
+    "text": "关键词：RT-Thread；边端协同；AprilTag视觉定位；声纹识别；大语言模型；智能图书馆",
+    "bold": true,
+    "indent": false
+  },
+  {
+    "type": "page_break"
+  },
+  {
+    "type": "heading",
+    "text": "第一部分  作品概述",
+    "level": 1
+  },
+  {
+    "type": "heading",
+    "text": "1.1 功能与特性",
+    "level": 2
+  },
+  {
+    "type": "para",
+    "text": "（1）多模态图书录入。支持HDMI触屏、微信小程序、语音指令三种交互方式。语音链路集成SenseVoice端侧ASR，云端调用DeepSeek大模型、断网时自动切换本地Qwen3-0.6B微调模型，提取书名并归类至教辅、文学、科技、其他四类，辅以拼音模糊匹配纠正口语误差。\n（2）自助借还与自动归位。读者通过小程序选书生成任务QR码，OV5695摄像头扫码触发机械爪取书；还书时整书区逐本推送，K230视觉模块识别书标QR后AprilTag导航系统引导机械爪精准归位至原槽位。\n（3）智能语音管理。经ERes2Net声纹鉴权后，管理员说出书名即可自动完成语音转写、语义提取、分类决策、数据库注册与标签打印的全链路处理。\n（4）双终端协同监控。HDMI触屏提供书架看板、书籍管理、用户管理、任务监控、系统工具六大管理模块；微信小程序面向读者提供书架浏览、扫码借还、借阅记录等自助服务。"
+  },
+  {
+    "type": "heading",
+    "text": "1.2 应用领域",
+    "level": 2
+  },
+  {
+    "type": "para",
+    "text": "本系统面向小型图书馆、社区图书室、教室图书角等藏书数百至数千册的中小型场景。此类场景普遍面临人力不足、错架率高、借还效率低等痛点，而大型RFID管理系统单套成本逾万元难以推广。本系统以低成本嵌入式平台为核心，具备以下应用优势：\n（1）社区与乡村图书馆：全国超58万个农家书屋亟待智能化升级，本系统自动化归位与自助借还可显著降低人力依赖。\n（2）中小学教室图书角：小程序借还+逾期自动处罚机制提升管理规范性，契合“书香校园”建设需求。\n（3）企业技术图书站：语音录入与AI自动分类简化新书上架流程，声纹鉴权确保管理权限安全。\n（4）嵌入式教学平台：系统完整覆盖RT-Thread标准版与RT-Smart、实时控制、机器视觉、语音处理、无线通信等典型嵌入式应用场景，可作为综合实践教学案例。"
+  },
+  {
+    "type": "heading",
+    "text": "1.3 主要技术特点",
+    "level": 2
+  },
+  {
+    "type": "para",
+    "text": "（1）三芯异构边端协同。RK3566（Linux）承载AI推理与业务调度；K230（RT-Smart）专用于视觉扫码与AprilTag位姿估计；STM32（RT-Thread标准版）执行实时电机伺服与限位响应，三芯TCP+UART松耦合互联。\n（2）AprilTag视觉伺服定位。槽位贴附AprilTag 25h9标记，K230单目PnP解算位姿，PID闭环控制实现毫米级存取，消除开环累积误差。\n（3）双引擎AI管线。DeepSeek云端优先完成语义理解与四分类，断网自动切换本地Qwen3-0.6B微调模型，GBNF语法约束输出，拼音模糊匹配三级容错。\n（4）状态机驱动的统一调度。有限状态机建模借还操作，ReturnFlowManager管理7状态流转与超时重试，TaskQueue三级优先级调度。"
+  },
+  {
+    "type": "heading",
+    "text": "1.4 主要性能指标",
+    "level": 2
+  },
+  {
+    "type": "table",
+    "headers": [
+      "指标",
+      "参数",
+      "说明"
+    ],
+    "rows": [
+      [
+        "主控芯片",
+        "Rockchip RK3566",
+        "Cortex-A55x4, 2GB RAM"
+      ],
+      [
+        "AI视觉芯片",
+        "K230 x2",
+        "RISC-V双核, KPU 1TOPS"
+      ],
+      [
+        "实时控制",
+        "STM32F407VET6",
+        "Cortex-M4, RT-Thread"
+      ],
+      [
+        "摄像头",
+        "OV5695 MIPI CSI",
+        "500万像素, 640x480"
+      ],
+      [
+        "显示屏",
+        "HDMI IPS触屏",
+        "1024x600@60Hz"
+      ],
+      [
+        "单次借书",
+        "全链路自动执行",
+        "QR扫码→DB处理→任务队列→机械爪取书"
+      ],
+      [
+        "单次还书",
+        "全链路自动执行",
+        "推书→扫码→状态机调度→视觉导航→上架"
+      ],
+      [
+        "定位方式",
+        "视觉闭环伺服",
+        "AprilTag 25h9 PnP位姿估计+PID闭环"
+      ],
+      [
+        "语音识别",
+        "端侧离线+云端协同",
+        "SenseVoice端侧ASR+DeepSeek云端推理"
+      ],
+      [
+        "声纹验证",
+        "512维嵌入向量",
+        "ERes2Net 余弦相似度验证+语音分离设计"
+      ],
+      [
+        "扫码可靠性",
+        "多级容错保障",
+        "CRC4校验+quirc vote 3/3投票机制"
+      ],
+      [
+        "待机功耗",
+        "<15W",
+        "不含电机驱动"
+      ],
+      [
+        "通信",
+        "802.11bgn 2.4GHz",
+        "文本行协议+CRC4校验"
+      ]
+    ]
+  },
+  {
+    "type": "heading",
+    "text": "1.5 主要创新点",
+    "level": 2
+  },
+  {
+    "type": "para",
+    "text": "（1）提出面向小型图书馆的边端协同自动归位技术路线，以三芯异构架构替代传统RFID，降低部署成本。\n（2）将AprilTag 25h9视觉基准标记引入图书存取场景，以单目视觉闭环取代步进电机开环，根除机械累积误差。\n（3）设计云端-本地双引擎AI推理架构，有网调用云端大模型、断网自动切换端侧微调模型，兼顾推理质量与离线可用性。\n（4）提出文本行+CRC4校验的轻量级通信协议，兼顾可调试性与传输可靠性。"
+  },
+  {
+    "type": "heading",
+    "text": "1.6 设计流程",
+    "level": 2
+  },
+  {
+    "type": "para",
+    "text": "（1）机械搭建：书架体与三轴直角坐标机械爪，7路步进电机传动。（2）电路搭建：220V→12V供电，隔离电源分区电路板，Zigbee+RS485分布控制。（3）软件开发：STM32的RT-Thread固件，RK3566的AI双引擎+Flask+Bridge，HDMI面板与小程序。（4）系统联调：K230扫码→视觉导航→借还流程→STM32对接。（5）迭代优化：驱动修复、WiFi加固、AI模型量化。"
+  },
+  {
+    "type": "page_break"
+  },
+  {
+    "type": "heading",
+    "text": "第二部分  系统组成及功能说明",
+    "level": 1
+  },
+  {
+    "type": "heading",
+    "text": "2.1 整体介绍",
+    "level": 2
+  },
+  {
+    "type": "para",
+    "text": "系统采用三芯对等协同拓扑结构。RK3566作为业务调度与AI推理节点，通过2.4GHz WiFi构建局域网，四核Cortex-A55全开运行Linux 6.1.141，承载Flask API、SQLite数据库、语音AI双引擎与扫码服务。K230 #1部署于整书区底部，运行RT-Smart，扫描书标QR码并以TCP长连接上报；K230 #2部署于书架前方，同样运行RT-Smart，识别AprilTag 25h9标记并通过UART桥接至主控STM32。控制层采用分布式架构：STM32F407VET6作为主控节点运行RT-Thread标准版，通过Zigbee无线串口广播模式连接推书装置区、机械爪区、三轴运动区的子控制器（STM32F103C8T6），实现对7路一体化步进电机与多路传感器的精确协调控制。OV5695通过MIPI CSI直连RK3566扫描用户任务QR码；EM20L热敏打印机通过UART直连RK3566。微信小程序通过Tailscale Funnel公网HTTPS隧道远程访问，HDMI触屏通过本地HTTP访问。各设备间关键数据帧附加CRC4校验。"
+  },
+  {
+    "type": "heading",
+    "text": "系统整体框图",
+    "level": 3
+  },
+  {
+    "type": "code",
+    "text": "                     微信小程序 (HTTPS公网隧道)\n                                |\n ┌────────── 2.4GHz WiFi 局域网 ────────────────────────────┐\n │  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐                │\n │  │K230#1│  │K230#2│  │OV5695│  │EM20L │                │\n │  │QR扫描 │  │AprilTag│ │任务QR│  │打印机 │                │\n │  │RT-Smart│ │RT-Smart│ │MIPI  │  │UART  │                │\n │  └──┬───┘  └──┬───┘  └──┬───┘  └──┬───┘                │\n │     │ TCP     │ TCP     │ CSI     │ UART                │\n │     └─────────┼─────────┼─────────┘                     │\n │               ▼         ▼                                │\n │       ┌──────────────────────────┐                      │\n │       │         RK3566           │                      │\n │       │  Linux 6.1 (Cortex-A55×4)│                      │\n │       │  Flask API + SQLite      │                      │\n │       │  AI双引擎(DeepSeek+Qwen3)│                      │\n │       └────────────┬─────────────┘                      │\n │                    │ UART(无线串口)                       │\n │       ┌────────────▼──────────────────┐                 │\n │       │  STM32F407VET6 (RT-Thread)   │                 │\n │       │  主控 — Zigbee广播协调        │                 │\n │       └──┬────────┬────────┬─────────┘                 │\n │          │Zigbee  │Zigbee  │Zigbee                      │\n │  ┌───────▼──┐ ┌───▼────┐ ┌▼──────────┐                │\n │  │推书装置区 │ │机械爪区 │ │三轴运动系统│                │\n │  │STM32F103 │ │STM32F103│ │STM32F103  │                │\n │  │×2步进电机│ │×1步进电机│ │×4步进电机  │                │\n │  │+限位/红外 │ │+限位开关│ │+限位开关   │                │\n │  └──────────┘ └────────┘ └───────────┘                │\n └─────────────────────────────────────────────────────────┘\n              HDMI触屏 (1024x600) 管理员面板"
+  },
+  {
+    "type": "para",
+    "text": "图2-1 系统整体架构框图",
+    "indent": false
+  },
+  {
+    "type": "heading",
+    "text": "2.2 硬件系统介绍",
+    "level": 2
+  },
+  {
+    "type": "heading",
+    "text": "2.2.1 硬件整体介绍",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "系统硬件由计算核心、视觉感知、执行机构、人机交互四部分组成。计算层：RK3566单板计算机（Cortex-A55×4, 2.0GHz, 2GB LPDDR4, 8GB eMMC, Linux 6.1），提供USB 2.0 Host扩展WiFi网卡与外设；K230×2（RISC-V双核, KPU 1TOPS, 512MB）运行RT-Smart处理视觉任务；控制层采用分布式架构——STM32F407VET6主控（Cortex-M4, 168MHz, RT-Thread标准版）通过Zigbee无线串口广播模式连接推书装置区、机械爪区、三轴运动区的子控制器（各搭载STM32F103C8T6），共管控7路42步进电机（驱动控制一体化）、多路限位开关与对射红外传感器。视觉感知含三路摄像头：OV5695 MIPI CSI（500万像素, 2-lane）扫描任务QR码；K230 #1板载GC2093（1920×1080）扫描书标QR码；K230 #2全局快门摄像头检测AprilTag 25h9标记。执行机构为三轴直角坐标机械爪与EM20L热敏打印机（58mm, 203dpi, GBK编码）。人机交互含1024×600 HDMI触控屏和微信小程序。"
+  },
+  {
+    "type": "heading",
+    "text": "2.2.2 机械设计介绍",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "书柜整体为立方体结构，书架区域采用琴立式斜面设计（600×400×250mm），上下两层每层8槽位共16个存书位置，适配A5及以下书籍。机械爪为三轴直角坐标结构：X轴沿书架导轨水平移动（600mm行程，2路42步进电机+同步带驱动）；Y轴两层间垂直切换（200mm行程，1路42步进电机+丝杆升降）；Z轴进出槽位（80mm行程，1路42步进电机+平行夹爪）。夹爪由第5路独立步进电机控制开合。各轴两端设光电限位开关用于原点校准与行程保护。整书区位于书柜底部，采用倾斜滑板+丝杆推书板结构，由2路42步进电机驱动丝杆逐本推送至底部扫码位，推完时STOP:RETURN QR码进入K230 #1视野通知系统循环结束。全系统共7路42步进电机，均为驱动控制一体化设计，Zigbee无线串口+RS485总线实现分布式精确控制，单次取书或还书的完整机械流程由状态机统一调度自动完成。"
+  },
+  {
+    "type": "heading",
+    "text": "2.2.3 电路各模块介绍",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "系统供电链路：220V交流市电经200W电源变压器模块降压至12V直流，分三路接入推书装置、机械爪、三轴运动系统的自制电路板。每块电路板以海凌科URB24XXYMD-10WR3隔离电源模块为核心，提供三路输出——12V-12V隔离（供步进电机动力电）、12V降5V（供Zigbee无线串口模块与RS485协议模块）、12V降3.3V（供STM32F103C8T6子控制器），实现动力电与控制电的电气隔离，杜绝电机干扰耦合至逻辑电路。\n\n控制架构采用分布式设计，主控STM32F407VET6通过Zigbee无线串口广播模式（CC2530芯片，外接SMA天线，2.4GHz）连接各区域子控制器，克服单主控IO资源不足与长距离布线冗杂的工程约束：（1）推书装置区——1块电路板，STM32F103C8T6管理2路步进电机、限位开关与对射红外传感器，红外传感器检测书本到位后触发推书动作；（2）机械爪区——1块电路板，STM32F103C8T6管理夹爪步进电机与各轴限位开关；（3）三轴运动系统——电路板置于结构顶部，12V经隔离后分配至X轴2路、Y轴1路、Z轴1路共4路步进电机，每路电机上方设独立12V降5V模块为Zigbee无线串口模块与TTL转RS485协议模块供电，主控通过Zigbee广播指令经RS485总线精确控制各电机的转速、转向与行程。\n\nRK3566侧接口：（1）MIPI CSI dphy1（2-lane）接OV5695（I2C控制, rkisp驱动），V4L2缓冲区须≥4以保证连续采集。（2）无线串口模块通过UART与主控STM32交换坐标指令与控制信号；另一路UART直连EM20L热敏打印机（GBK编码, 3线制需clocal模式）。（3）USB 2.0 Host经有源Hub（外接5V供电, TX高负载时供电不足将触发总线挂死→硬件看门狗复位）扩展WiFi网卡（88x2bu芯片, 802.11bgn 2.4GHz）、HDMI触屏触控信号与调试串口。（4）HDMI通过Lontium LT6911UXC桥接芯片输出1024×600@60Hz（TMDS 51.25MHz, 强制RGB, VP0独占CRTC）。（5）RK809 Codec模拟音频——MIC1P单端接入驻极体麦克风（PGA+27dB, Boost+30dB），16kHz S32_LE采样，上电须经OFF→Main Mic序列触发ADC直流偏置校准。"
+  },
+  {
+    "type": "heading",
+    "text": "2.3 软件系统介绍",
+    "level": 2
+  },
+  {
+    "type": "heading",
+    "text": "2.3.1 软件整体介绍",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "系统软件采用五层架构：（1）操作系统层——RK3566 Linux 6.1提供V4L2/ALSA/UART/DRM内核驱动，K230 RT-Smart提供摄像头/QR/AprilTag/TCP协议栈，STM32 RT-Thread提供UART驱动/外部中断/ADC采样/多线程划分/信号量/互斥量/事件集等完整RTOS服务。（2）中间件层——K230 Bridge（TCP协议转换与CRC4校验）、Voice Service（ASR+声纹推理）、QR Scanner（OV5695持续扫码）。（3）业务逻辑层——Flask API（30+端点）、SQLite数据层（雪花ID+WAL模式）、任务队列（三级优先级）。（4）表示层——HDMI触屏单页应用（虚拟键盘+拼音联想）、微信小程序（3 Tab）。（5）AI服务层——端侧SenseVoice-Small（229MB int8）+ ERes2Net（38MB）+ 云端DeepSeek v4-pro + 本地Qwen3-0.6B微调模型（379MB Q4_K_M GGUF），双引擎按网络状态自动切换。"
+  },
+  {
+    "type": "code",
+    "text": "┌─────────────────────────────────────────────┐\n│                  表示层                      │\n│  ┌──────────────┐  ┌──────────────┐         │\n│  │ screen.html  │  │  微信小程序    │         │\n│  │ HDMI触屏管理  │  │ 3 Tab(架/借/我)│         │\n│  └──────┬───────┘  └──────┬───────┘         │\n│         └────────┬────────┘                  │\n│                  ▼ HTTPS                     │\n│  ┌──────────────────────────────────┐       │\n│  │      业务逻辑层 (Flask :9777)     │       │\n│  │  app.py | db.py | tasks.py       │       │\n│  └──────┬──────────┬───────────────┘       │\n│         ▼          ▼          ▼             │\n│  ┌──────────┐ ┌────────┐ ┌──────────┐     │\n│  │K230Bridge│ │QRScan  │ │Voice:8890│     │\n│  │:9998:9997│ │OV5695  │ │ASR+声纹   │     │\n│  └────┬─────┘ └──┬─────┘ └────┬─────┘     │\n├───────┼──────────┼────────────┼────────────┤\n│       ▼     MIPI CSI         ▼              │\n│  ┌────────┐ ┌──────┐ ┌──────────────┐     │\n│  │K230 x2 │ │OV5695│ │SenseVoice+   │     │\n│  │RT-Smart│ │摄像头 │ │ERes2Net      │     │\n│  └───┬────┘ └──────┘ └──────────────┘     │\n│      │ UART2                                │\n│      ▼                                      │\n│  ┌──────────────────┐                      │\n│  │STM32F407 RT-Thread主控│                  │\n│  │UART+EXTI+ADC+线程+    │                  │\n│  │信号量+互斥量+事件集   │                  │\n│  │Zigbee(CC2530)广播    │                  │\n│  └──────────────────┘                      │\n│  OS: Linux 6.1 | RT-Smart | RT-Thread      │\n└─────────────────────────────────────────────┘"
+  },
+  {
+    "type": "para",
+    "text": "图2-2 软件系统分层架构",
+    "indent": false
+  },
+  {
+    "type": "heading",
+    "text": "2.3.2 软件各模块详细介绍",
+    "level": 3
+  },
+  {
+    "type": "heading",
+    "text": "A. Flask API 业务逻辑模块",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "Flask应用是核心调度引擎，提供30+个RESTful端点。关键设计：（1）JSON大整数安全编码——雪花算法生成64位ID（42位时间戳+10位机器ID+12位序列号），自定义Encoder将超过2^53的整数转字符串，避免小程序端JavaScript精度截断。（2）Bearer Token鉴权——管理员登录获取token，声纹验证成功自动关联speaker至admin身份。（3）Bridge跨进程通信——Flask与Bridge独立进程，通过TCP本地回环发送ADMIN控制指令，避免模块导入导致状态不一致。（4）任务系统——借书先DB变更后入队UART，还书由状态机调度K230#1扫码→K230#2上架的完整循环，支持任务状态实时轮询。"
+  },
+  {
+    "type": "heading",
+    "text": "B. K230 Bridge v2 通信中间件",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "K230 Bridge是RK3566与K230模块间的协议转换中间件，以独立进程常驻运行。核心设计：（1）K230 #1长连接管理——维护单一连接句柄，按首行识别消息身份，管理指令即时处理即断开不替换数据链路。（2）协议解析与路由——正则匹配BOOK:<id>:<CRC4>、STOP:RETURN:<CRC4>等消息帧格式，无活跃流程时进入独立校验模式仅验证书本状态。（3）还书状态机——7状态流转（IDLE→WAITING_TRIGGER→VALIDATING_BOOK→SHELVING→WAITING_DONE→PUSHING_NEXT→DONE），30秒超时重试，连续3次无效扫码触发告警。（4）CRC4数据校验——CRC-4/ITU（poly=0x3, init=0x0），仅处理每字节低4位，四种测试用例验证通过（CRC4(\"BOOK:12345\")=0009, CRC4(\"BOOK:1\")=000A, CRC4(\"STOP:RETURN\")=000B, CRC4(\"HELLO\")=000C）。（5）K230 #2通信——TCP客户端发送SHELVE/FETCH/INIT等坐标指令，监听接收TRIGGER/DONE/FETCH_DONE事件通知，IP通过环境变量动态配置。（6）持久化事件日志，结构化格式1MB轮转存储。"
+  },
+  {
+    "type": "heading",
+    "text": "C. AI 语音处理管线",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "语音AI子系统实现从声学信号到结构化书目的完整处理链路：\n（1）音频采集——RK809 Codec S32_LE 16kHz单声道，上电序列触发ADC直流偏置校准，子进程采集配合信号处理优雅退出。\n（2）声纹验证——sherpa-onnx框架加载ERes2Net模型提取512维说话人嵌入向量，余弦相似度≥0.5判定身份，验证通过后直接返回（延迟约50ms）跳过后续AI链路。\n（3）端侧ASR——SenseVoice-Small int8量化模型（229MB），CPU推理RTF≈0.6（3秒音频约1.7秒处理），支持热加载与卸载（内存增量约517MB），预热机制消除冷启动延迟。\n（4）云端-本地双引擎LLM——优先调用DeepSeek v4-pro API（Few-shot提示词），网络中断时自动切换至本地Qwen3-0.6B微调模型。该模型基于15,144条合成训练数据（DeepSeek全生成唯一书名+100余种噪声组合注入，四分类均衡25%±1%）经LoRA微调（ModelScope A10, 3 epochs, final loss 0.20），FP16合并后经llama.cpp量化至Q4_K_M GGUF格式（610MB→379MB），针对ARM Cortex-A55交叉编译（DOTPROD+FP16_VA指令集适配），GBNF语法约束强制输出四分类之一，基本满足端侧离线分类需求。双引擎切换对上层业务透明。\n（5）三级容错——LLM语义理解（一级）→SQLite精确/模糊匹配（二级）→category_rules.py关键词规则兜底（三级），pypinyin拼音模糊匹配（47,100条短语词典构建2-gram语言模型）对抗同音字错误。"
+  },
+  {
+    "type": "heading",
+    "text": "D. OV5695 扫码服务",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "QR扫码服务从OV5695摄像头持续采集640×480帧，OpenCV QRCodeDetector实时检测QR码，识别成功调用Flask API执行对应借还任务。关键技术：（1）V4L2缓冲区修复——rkisp驱动要求BUFFERSIZE≥4，设为1将导致缓冲区耗尽返回全黑帧，仅冷重启后首次有效。（2）进程生命周期管理——SIGTERM信号处理器确保cap.release()正确调用，禁用SIGKILL强制终止以避免V4L2设备状态永久损坏。（3）运行性能——扫码间隔0.15s，CPU占用约55%（单核A55），内存占用约45MB。"
+  },
+  {
+    "type": "heading",
+    "text": "E. 任务队列与状态机",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "tasks.py实现三级优先级任务队列：BORROW(1)>RETRIEVE(2)>SHELVE(3)。先DB后UART策略——借书先SQLite状态变更（在架->已借出）再入队UART，UART失败不回滚DB（状态一致性优先）。借阅规则校验：冻结状态、借阅上限5本、逾期30天自动冻结、欠费0.5元/天累加，均在DB事务内完成。"
+  },
+  {
+    "type": "heading",
+    "text": "F. 微信小程序",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "小程序基于微信原生框架（3 Tab：书架/借还/我的）。（1）QR码任务交互——用户选操作后生成QR出示给OV5695扫码，后端异步执行机械操作，前端1.5秒轮询任务状态。（2）大整数安全——Flask JSONEncoder将>2^53的ID转字符串，小程序data-*属性传索引而非ID值。（3）HTTPS公网——Tailscale Funnel提供固定域名与Let's Encrypt自动SSL证书，满足微信合法域名要求。（4）PIN提权——连续点击头像5次弹出PIN码输入框，兼顾安全与便捷。"
+  },
+  {
+    "type": "heading",
+    "text": "G. HDMI 管理员触屏面板",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "screen.html为纯HTML/CSS/JS单页应用（1024x600），基于Chromium kiosk模式运行于Weston Wayland合成器之上。（1）声纹登录——MediaRecorder API采集5秒音频，POST WAV至语音服务进行ERes2Net声纹验证，验证通过自动关联admin token，延迟约50ms。（2）虚拟键盘——纯JS实现中/英/数三种输入模式，中文模式集成pypinyin 2-gram语言模型（47,100条短语）实现智能词语联想，适配触摸屏操作。（3）书架看板——每5秒轮询16槽位状态，彩色方块实时映射在架/借出/待上架状态，点击槽位弹出操作面板支持上下架指令。（4）语音录入预热——登录后预加载ASR模型与LLM KV cache，将语音录入冷启动延迟从约59秒压缩至约12秒。（5）K230状态监控——实时展示双K230连接状态、扫码计数与事件日志，支持WAKE/SLEEP远程控制。"
+  },
+  {
+    "type": "heading",
+    "text": "H. K230 RT-Smart 应用",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "K230 #1应用程序运行于RT-Smart系统：WiFi STA自动接入局域网（WPA2-PSK, DHCP, 重试机制）；TCP客户端连接RK3566（重连+READY握手）；收到WAKE指令后启动GC2093摄像头（1920×1080）配合quirc库进行QR解码（vote 3/3投票机制过滤单次误检）；WAKE/SLEEP状态管理配合LED指示；断连自动重连与发送重试。K230 #2同样运行RT-Smart：实现AprilTag 25h9标记检测与PnP位姿解算，TCP服务器监听接收SHELVE/FETCH/INIT坐标指令，UART2串口桥接至主控STM32（38400bps 8N1），TRIGGER/DONE/FETCH_DONE事件通过短连接上报RK3566。"
+  },
+  {
+    "type": "page_break"
+  },
+  {
+    "type": "heading",
+    "text": "第三部分  完成情况及性能参数",
+    "level": 1
+  },
+  {
+    "type": "heading",
+    "text": "3.1 整体介绍",
+    "level": 2
+  },
+  {
+    "type": "para",
+    "text": "系统已完成全部功能开发与联调验证：（1）RK3566平台——Flask API（30+端点）、SQLite（5表WAL）、K230 Bridge v2、OV5695扫码服务、AI双引擎语音管线（ASR+声纹+DeepSeek+Qwen3离线切换）、HDMI管理面板（6大功能模块）、微信小程序（3 Tab）全部部署运行。（2）K230 #1视觉子系统——READY→WAKE→BOOK:ID:CRC4→ACK/NAK→SLEEP全链路验证通过，QR扫码配合CRC4校验与vote 3/3投票机制，可有效过滤单次误检并验证数据完整性。（3）K230 #2视觉伺服子系统——AprilTag 25h9标记检测与PnP位姿解算已实现，TCP服务器接收SHELVE/FETCH/INIT坐标指令，UART2桥接至主控STM32，配合PID闭环控制实现毫米级机械爪定位。（4）STM32分布式实时控制——主控通过Zigbee广播协调三区域子控制器，7路步进电机RS485总线精确控制，限位开关与红外传感器中断响应全部调通，借还全流程自动化运行。（5）公网访问——Tailscale Funnel HTTPS隧道已接入微信小程序合法域名白名单，Let's Encrypt自动证书，支持远程借还操作。"
+  },
+  {
+    "type": "heading",
+    "text": "3.2 工程成果",
+    "level": 2
+  },
+  {
+    "type": "heading",
+    "text": "3.2.1 机械成果",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "（实物照片待拍摄——书架体、机械爪运动平台、整书区推书装置、EM20L打印机安装照片）"
+  },
+  {
+    "type": "heading",
+    "text": "3.2.2 电路成果",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "（实物照片待拍摄——RK3566开发板+USB Hub+WiFi网卡+OV5695摄像头、K230开发板x2、STM32控制板）"
+  },
+  {
+    "type": "heading",
+    "text": "3.2.3 软件成果",
+    "level": 3
+  },
+  {
+    "type": "para",
+    "text": "（界面截图待拍摄——HDMI触屏管理员面板6个功能页、微信小程序3个Tab、扫码操作流程、系统工具诊断页）"
+  },
+  {
+    "type": "heading",
+    "text": "3.3 特性成果",
+    "level": 2
+  },
+  {
+    "type": "table",
+    "headers": [
+      "功能特性",
+      "状态",
+      "量化参数"
+    ],
+    "rows": [
+      [
+        "小程序借书全链路",
+        "已验证",
+        "扫码→DB处理→任务队列→取书, 全链路自动执行"
+      ],
+      [
+        "还书QR生成+轮询",
+        "已完成",
+        "任务状态轮询+本地倒计时"
+      ],
+      [
+        "OV5695连续扫码",
+        "已完成",
+        "V4L2缓冲区修复, 连续采集稳定"
+      ],
+      [
+        "K230 #1 QR+CRC4",
+        "已完成",
+        "1920x1080采集, vote 3/3+CRC4校验"
+      ],
+      [
+        "K230 #2 AprilTag导航",
+        "已完成",
+        "AprilTag 25h9 PnP位姿估计+UART2桥接"
+      ],
+      [
+        "管理员声纹登录",
+        "已验证",
+        "ERes2Net 512维嵌入+余弦验证"
+      ],
+      [
+        "语音AI书名识别",
+        "已验证",
+        "端侧ASR+双引擎LLM云端/本地切换"
+      ],
+      [
+        "HDMI触屏管理面板",
+        "已完成",
+        "6模块单页应用, kiosk模式常驻"
+      ],
+      [
+        "EM20L标签打印",
+        "已完成",
+        "UART+GBK编码"
+      ],
+      [
+        "Tailscale Funnel",
+        "已完成",
+        "Let's Encrypt自动证书"
+      ],
+      [
+        "管理员上下架(UART)",
+        "已完成",
+        "Zigbee+RS485分布式控制"
+      ],
+      [
+        "声纹注册+关联",
+        "已完成",
+        "5秒录音+嵌入提取"
+      ],
+      [
+        "sysmon系统监视",
+        "已完成",
+        "30s间隔, 1MB轮转日志"
+      ],
+      [
+        "K230 Bridge v2",
+        "已完成",
+        "双端口TCP, CRC4校验"
+      ]
+    ]
+  },
+  {
+    "type": "page_break"
+  },
+  {
+    "type": "heading",
+    "text": "第四部分  总结",
+    "level": 1
+  },
+  {
+    "type": "heading",
+    "text": "4.1 可扩展之处",
+    "level": 2
+  },
+  {
+    "type": "para",
+    "text": "（1）多书架并行扩展：AprilTag 25h9家族提供数百个唯一ID，可增设K230节点扩展至数十个书架协同管理。\n（2）NPU推理加速：RK3566内置1TOPS NPU尚未启用，ASR迁移至NPU预计RTF从0.6降至0.05以下。\n（3）RFID双模冗余：书标嵌入UHF RFID标签作为QR码冗余识别通道，适应标签污损遮挡等恶劣工况。\n（4）本地LLM持续优化：Qwen3-0.6B LoRA微调模型（379MB）已具备离线推理能力，后续通过扩充训练数据与模型蒸馏可进一步提升端侧分类准确率。\n（5）读者行为分析：基于借阅历史构建协同过滤推荐引擎，SQLite即可轻量实现。"
+  },
+  {
+    "type": "heading",
+    "text": "4.2 心得体会",
+    "level": 2
+  },
+  {
+    "type": "para",
+    "text": "本项目的核心挑战在于将嵌入式计算、实时控制、机器视觉、人工智能与机械执行五个异构子系统整合为一套协同工作的完整装置。以下从四个维度总结。\n\n一、异构芯片的协同架构设计。RK3566、K230与STM32三芯各司其职——Linux承载AI推理与业务调度，RT-Smart专攻视觉感知，RT-Thread保障实时控制——这一架构的核心洞察是：嵌入式系统的最优解不是统一平台，而是让每个子系统运行最适合其任务特征的操作系统。TCP文本行协议的选择体现了实用主义原则——文本格式可手工逐条验证，调试效率远优于二进制编码，CRC4校验以4位冗余换取了基本的数据完整性保障。\n\n二、分布式实时控制系统的工程实践。面对7路步进电机、多路传感器与长距离布线的约束，我们设计了Zigbee+RS485两级总线架构：主控STM32F407广播指令，三块分区电路板搭载STM32F103子控制器各自管理本地设备，每路电机经RS485总线独立寻址。RT-Thread的多线程划分（控制线程+通信线程+传感器轮询）、信号量同步、事件集触发与外部中断响应的组合运用，保证了分布式控制的实时性与确定性。供电链路（220V→12V→隔离→分区供电）克服了电机干扰耦合至逻辑电路的电磁兼容问题。\n\n三、AI模型从训练到端侧部署的完整工程。Qwen3-0.6B的部署跨越数据工程（DeepSeek合成1.5万条数据+百余种噪声注入）、模型微调（LoRA, A10, 3 epochs）、模型压缩（FP16→Q4_K_M GGUF, 610MB→379MB）、交叉编译（ARM Cortex-A55, DOTPROD+FP16_VA指令集适配）与推理优化（GBNF语法约束输出）五个环节。双引擎架构（云端优先+本地兜底）是在2GB RAM约束下的务实权衡——端侧推理能力虽不及云端大模型，但保障了离线核心功能可用，体现了边缘AI的鲁棒性设计原则。\n\n四、全栈嵌入式系统的方法论思考。从内核DTS引脚复用到Flask大整数安全编码到小程序HTTPS域名合规——每一抽象层都可能成为瓶颈。最大的方法论收获是：复杂嵌入式系统的可靠性不在于单点极致优化，而在于每层留有裕量、每个接口配备兜底策略、每个异常可追溯。边端协同的工程本质，正是在资源受限条件下，通过架构分层与协议设计，将离散的硬件能力组织为协同工作的有机整体。"
+  },
+  {
+    "type": "page_break"
+  },
+  {
+    "type": "heading",
+    "text": "第五部分  参考文献",
+    "level": 1
+  },
+  {
+    "type": "para",
+    "text": "[1] RT-Thread 官方文档. https://www.rt-thread.org/document/site/",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[2] Rockchip RK3566 Datasheet. Rockchip Electronics, 2021.",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[3] K230 CanMV 开发文档. 立创开源硬件平台, 2024.",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[4] E. Olson, \"AprilTag: A Robust and Flexible Visual Fiducial System,\" Proc. IEEE ICRA, 2011, pp. 3400-3407.",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[5] J. Wang et al., \"3D-Speaker: A Large-Scale Multi-Device, Multi-Distance, and Multi-Dialect Corpus for Speech Representation Disambiguation,\" arXiv:2306.15354, 2023.",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[6] Y. Gao et al., \"SenseVoice: A Versatile Speech Foundation Model for Multilingual Speech Processing,\" arXiv:2407.05361, 2024.",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[7] DeepSeek v4-pro API Documentation. DeepSeek AI, 2025.",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[8] sherpa-onnx: Real-time Speech Recognition. https://github.com/k2-fsa/sherpa-onnx, 2024.",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[9] quirc: QR Code Decoder Library. https://github.com/dlbeer/quirc/",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[10] OpenCV Library. https://opencv.org/",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[11] Flask Web Framework. https://flask.palletsprojects.com/",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[12] SQLite Database Engine. https://sqlite.org/",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[13] Tailscale Funnel. https://tailscale.com/",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[14] 88x2bu WiFi Driver (morrownr). https://github.com/morrownr/88x2bu-20210702",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[15] EM20L 热敏打印机开发手册. 深圳硕芯科技, 2023.",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[16] BT8825 扫码模组通信协议手册, 2023.",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[17] ITU-T G.704: CRC-4 Specification, 1998.",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[18] T. Bray, \"The JSON Data Interchange Format,\" RFC 8259, 2017.",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[19] V4L2 API Specification. Linux Kernel Documentation.",
+    "indent": true
+  },
+  {
+    "type": "para",
+    "text": "[20] Rockchip RK809 PMIC Datasheet. Rockchip Electronics, 2021.",
+    "indent": true
+  }
+]

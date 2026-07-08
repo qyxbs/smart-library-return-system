@@ -1,0 +1,34 @@
+#!/bin/sh
+# S99sysmon — System monitor daemon (2026-06-27)
+# Persistent logging to /userdata/log/sysmon.log
+
+PIDFILE=/var/run/sysmon.pid
+SCRIPT=/usr/bin/sysmon.sh
+
+case "$1" in
+  start)
+    if [ -f $PIDFILE ] && kill -0 $(cat $PIDFILE) 2>/dev/null; then
+        echo "sysmon already running (PID $(cat $PIDFILE))"
+        exit 0
+    fi
+    echo "Starting sysmon..."
+    nohup $SCRIPT > /dev/null 2>&1 &
+    echo $! > $PIDFILE
+    echo "sysmon started (PID $(cat $PIDFILE))"
+    ;;
+  stop)
+    [ -f $PIDFILE ] && kill $(cat $PIDFILE) 2>/dev/null
+    rm -f $PIDFILE
+    echo "sysmon stopped"
+    ;;
+  status)
+    if [ -f $PIDFILE ] && kill -0 $(cat $PIDFILE) 2>/dev/null; then
+        echo "sysmon running (PID $(cat $PIDFILE))"
+        echo "Last 5 log lines:"
+        tail -5 /userdata/log/sysmon.log 2>/dev/null
+    else
+        echo "sysmon not running"
+    fi
+    ;;
+  *) echo "Usage: $0 {start|stop|status}" ;;
+esac

@@ -1,0 +1,59 @@
+<view class="title-bar"><text class="title-text">搜索书本</text></view>
+
+<view class="page-container">
+  <!-- 搜索栏 -->
+  <view class="search-row">
+    <van-field
+      value="{{ keyword }}"
+      placeholder="输入书名或作者搜索"
+      border="{{ true }}"
+      bind:change="onInput"
+      bind:confirm="onSearch"
+      custom-style="background:#161b22; border-radius:12rpx;"
+    >
+      <van-button slot="button" type="primary" size="small" bind:click="onSearch">
+        搜索
+      </van-button>
+    </van-field>
+  </view>
+
+  <!-- 搜索结果 -->
+  <view wx:if="{{ searched }}">
+    <view class="section-title">
+      搜索结果 {{ results.length > 0 ? '(' + results.length + ')' : '' }}
+    </view>
+    <view wx:if="{{ results.length > 0 }}">
+      <view class="book-item" wx:for="{{ results }}" wx:key="id"
+            data-index="{{ index }}" bind:tap="onBookTap">
+        <view class="book-item-content">
+          <view class="book-item-title">{{ item.title }}</view>
+          <view class="book-item-meta">{{ item.category }}</view>
+        </view>
+        <van-icon name="arrow" size="16px" color="#484f58" />
+      </view>
+    </view>
+    <view wx:else class="empty-state">
+      <text>未找到匹配的书本</text>
+    </view>
+  </view>
+
+  <!-- 在架书籍 -->
+  <view wx:if="{{ !searched }}">
+    <view class="section-title">在架书籍 ({{ shelfBooks.length }}本)</view>
+    <view wx:if="{{ shelfBooks.length > 0 }}">
+      <view class="book-item" wx:for="{{ shelfBooks }}" wx:key="instance_id"
+            data-index="{{ index }}" bind:tap="onShelfBookTap">
+        <view class="book-item-content">
+          <view class="book-item-title">{{ item.title }}</view>
+          <view class="book-item-meta">{{ item.remark }}</view>
+        </view>
+        <van-icon name="arrow" size="16px" color="#484f58" />
+      </view>
+    </view>
+    <view wx:else class="empty-state">
+      <text>书架上暂时没有书</text>
+    </view>
+  </view>
+</view>
+
+<van-toast id="van-toast" />

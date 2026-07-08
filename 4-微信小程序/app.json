@@ -1,0 +1,59 @@
+{
+  "pages": [
+    "pages/shelf/shelf",
+    "pages/borrow/borrow",
+    "pages/my/my",
+    "pages/search/search",
+    "pages/book-detail/book-detail",
+    "pages/return/return",
+    "pages/qr-show/qr-show",
+    "pages/admin/admin"
+  ],
+  "window": {
+    "navigationBarTitleText": "智能书架",
+    "navigationBarBackgroundColor": "#1a1a2e",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0d1117"
+  },
+  "tabBar": {
+    "color": "#8b949e",
+    "selectedColor": "#58a6ff",
+    "backgroundColor": "#161b22",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/shelf/shelf",
+        "text": "书架",
+        "iconPath": "image/topic.png",
+        "selectedIconPath": "image/topic_hl.png"
+      },
+      {
+        "pagePath": "pages/borrow/borrow",
+        "text": "借还",
+        "iconPath": "image/hole.png",
+        "selectedIconPath": "image/hole_hl.png"
+      },
+      {
+        "pagePath": "pages/my/my",
+        "text": "我的",
+        "iconPath": "image/topic.png",
+        "selectedIconPath": "image/topic_hl.png"
+      }
+    ]
+  },
+  "usingComponents": {
+    "van-button": "@vant/weapp/button/index",
+    "van-toast": "@vant/weapp/toast/index",
+    "van-field": "@vant/weapp/field/index",
+    "van-cell": "@vant/weapp/cell/index",
+    "van-cell-group": "@vant/weapp/cell-group/index",
+    "van-icon": "@vant/weapp/icon/index",
+    "van-tag": "@vant/weapp/tag/index",
+    "van-nav-bar": "@vant/weapp/nav-bar/index",
+    "van-dialog": "@vant/weapp/dialog/index",
+    "van-empty": "@vant/weapp/empty/index",
+    "van-popup": "@vant/weapp/popup/index",
+    "van-checkbox": "@vant/weapp/checkbox/index",
+    "van-checkbox-group": "@vant/weapp/checkbox-group/index"
+  }
+}

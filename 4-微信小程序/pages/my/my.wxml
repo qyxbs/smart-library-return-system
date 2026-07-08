@@ -1,0 +1,98 @@
+<view class="title-bar"><text class="title-text">我的</text></view>
+
+<view class="page-container">
+  <!-- 已登录 -->
+  <block wx:if="{{ user }}">
+    <!-- 用户卡片 -->
+    <view class="user-card card">
+      <view class="user-avatar" bind:tap="onAvatarTap">
+        <text class="avatar-emoji">{{ isAdmin ? '🛡️' : '👤' }}</text>
+      </view>
+      <view class="user-info">
+        <view class="user-name">{{ user.nickname || '未设置昵称' }}</view>
+        <view class="user-id">ID: {{ user.user_id }}</view>
+        <view class="user-meta">
+          <view class="status-tag {{ isAdmin ? 'status-on-shelf' : 'status-pending' }}">
+            {{ isAdmin ? '管理员' : '普通用户' }}
+          </view>
+          <text class="borrow-count">借阅中: {{ borrowed.length }}本</text>
+          <text wx:if="{{ user.fine_balance > 0 }}" class="fine-alert">⚠️ 欠费: ¥{{ user.fine_balance }}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 管理功能 -->
+    <view class="section" wx:if="{{ isAdmin }}">
+      <view class="card-header">管理功能</view>
+      <view class="menu-list">
+        <view class="menu-item" bind:tap="onGoAdmin">
+          <text class="menu-icon">⚙️</text>
+          <text class="menu-text">管理面板</text>
+          <van-icon name="arrow" size="14px" color="#484f58" />
+        </view>
+      </view>
+    </view>
+
+    <!-- 借阅列表 -->
+    <view class="section">
+      <view class="card-header">当前借阅 ({{ borrowed.length }}本)</view>
+      <view wx:if="{{ borrowed.length > 0 }}">
+        <view class="book-item {{ getDueStatus(item.due_date) }}"
+              wx:for="{{ borrowed }}" wx:key="instance_id"
+              data-index="{{ index }}" bind:tap="onBookTap">
+          <view class="book-item-content">
+            <view class="book-item-title">{{ item.title }}</view>
+            <view class="book-item-meta">
+              <text class="due-badge {{ getDueStatus(item.due_date) }}">
+                · {{ getDueText(item.due_date) }}
+              </text>
+            </view>
+          </view>
+          <van-icon name="arrow" size="14px" color="#484f58" />
+        </view>
+      </view>
+      <view wx:else class="empty-state">
+        <text>📚</text>
+        <text>还没有借阅记录</text>
+      </view>
+    </view>
+
+    <!-- 退出 -->
+    <view class="logout-wrap">
+      <van-button type="default" block round bind:click="onLogout">退出登录</van-button>
+    </view>
+  </block>
+
+  <!-- 未登录 -->
+  <block wx:else>
+    <view class="empty-state" style="padding-top:120rpx;">
+      <van-icon name="user-o" size="64px" color="#484f58" />
+      <text style="margin-top:24rpx;">尚未登录</text>
+      <van-button type="primary" round bind:click="onLogin" style="margin-top:32rpx;">
+        微信一键登录
+      </van-button>
+    </view>
+  </block>
+
+  <!-- PIN 提权弹窗 -->
+  <van-popup show="{{ showPromote }}" position="center" custom-style="width:80%; border-radius:16rpx; background:#161b22; padding:40rpx;">
+    <view class="popup-title">管理员 PIN 码验证</view>
+    <view class="popup-hint">请输入管理员 PIN 码提升权限</view>
+    <van-field
+      value="{{ pinInput }}"
+      type="password"
+      placeholder="请输入 PIN 码"
+      border="{{ true }}"
+      bind:change="onPinInput"
+      custom-style="background:#0d1117; margin:24rpx 0;"
+    />
+    <view class="popup-buttons">
+      <van-button type="default" size="small" bind:click="onPromoteCancel">取消</van-button>
+      <van-button type="primary" size="small" loading="{{ promoting }}" bind:click="onPromoteConfirm">
+        确认
+      </van-button>
+    </view>
+  </van-popup>
+</view>
+
+<van-toast id="van-toast" />

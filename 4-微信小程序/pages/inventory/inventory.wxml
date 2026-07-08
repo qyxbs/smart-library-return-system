@@ -1,0 +1,42 @@
+<van-nav-bar title="查书" fixed placeholder z-index="100" />
+
+<view class="page-container">
+  <view class="search-bar">
+    <van-field
+      value="{{ keyword }}"
+      placeholder="输入书名搜索"
+      border="{{ true }}"
+      bind:input="onSearchInput"
+      bind:confirm="onSearch"
+    >
+      <van-button slot="button" type="primary" size="small" bind:click="onSearch">搜索</van-button>
+    </van-field>
+  </view>
+
+  <!-- Search results -->
+  <view class="section" wx:if="{{ results.length > 0 }}">
+    <view class="section-title">搜索结果</view>
+    <view class="book-list">
+      <view class="book-item" wx:for="{{ results }}" wx:key="id">
+        <view class="book-title">{{ item.title }}</view>
+        <view class="book-meta">{{ item.author }} · {{ item.category }}</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Shelf books -->
+  <view class="section">
+    <view class="section-title">在架书籍 ({{ shelfBooks.length }}本)</view>
+    <view class="book-list">
+      <view class="book-item shelf" wx:for="{{ shelfBooks }}" wx:key="instance_id" data-book="{{ item }}" bind:tap="onBookTap">
+        <view class="book-title">{{ item.title }}</view>
+        <view class="book-meta">{{ item.remark }} · {{ item.author }}</view>
+      </view>
+    </view>
+    <view class="empty" wx:if="{{ shelfBooks.length === 0 }}">
+      <text>书架上暂时没有书</text>
+    </view>
+  </view>
+</view>
+
+<van-toast id="van-toast" />
