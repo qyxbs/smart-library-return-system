@@ -2,7 +2,7 @@
 """
 OV5695 摄像头 QR 码扫描服务
 
-持续从摄像头采集图像 → 检测 QR 码 → 解析 task_id → 调用 Flask API 执行任务
+持续从摄像头采集图像 → 检测 QR 码 → 解析 task_id → 调用主控 API 执行任务
 
 部署:
   python3 qr_scanner.py --camera 0 --api http://127.0.0.1:9777
@@ -122,7 +122,7 @@ def parse_qr_content(qr_text: str) -> dict | None:
 
 
 def submit_to_api(api_base: str, qr_text: str) -> dict:
-    """Submit QR content to Flask API endpoint. Returns API response dict."""
+    """Submit QR content to main API endpoint. Returns API response dict."""
     try:
         resp = requests.post(
             f"{api_base}/api/qr/scan",
@@ -252,7 +252,7 @@ if __name__ == "__main__":
     parser.add_argument("--camera", type=int, default=DEFAULT_CAMERA,
                         help=f"Camera device index (default: {DEFAULT_CAMERA})")
     parser.add_argument("--api", default=DEFAULT_API,
-                        help=f"Flask API base URL (default: {DEFAULT_API})")
+                        help=f"Main API base URL (default: {DEFAULT_API})")
     parser.add_argument("--interval", type=float, default=SCAN_INTERVAL,
                         help=f"Frame interval in seconds (default: {SCAN_INTERVAL})")
     parser.add_argument("--once", action="store_true",

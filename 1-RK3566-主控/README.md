@@ -1,72 +1,81 @@
 # RK3566 主控
 
-RK3566 是系统的边缘计算中枢，运行 Linux 6.1，负责业务调度、AI 推理、桥接中间件与数据库管理。
+RK3566 是系统的边缘计算中枢，运行 Linux 6.1，负责业务调度、数据管理、桥接中间件与屏幕交互。
 
-## 文件说明
-
-### 核心应用 (`/userdata/book_app/`)
-
-| 文件 | 大小 | 说明 |
-|------|------|------|
-| `app.py` | 57 KB | Flask API 主程序，30+ 端点，含鉴权、UART 控制、任务管理 |
-| `db.py` | 29 KB | SQLite 数据库层，5 表 ORM，含槽位分配、借阅规则、罚款计算 |
-| `k230_bridge_v2.py` | 61 KB | K230 双向桥接中间件，TCP :9998/:9999 长连接管理，还书状态机 |
-| `tasks.py` | 12 KB | 机械爪任务队列（BORROW > RETRIEVE > SHELVE 三级优先级） |
-| `qr_scanner.py` | 10 KB | OV5695 连续扫码服务（V4L2 BUFFERSIZE=4），CRC4 校验 |
-| `screen.html` | 64 KB | HDMI 管理员触屏界面（1024×600），声纹登录 + 6 功能页 |
-| `print_label.py` | 7 KB | EM20L 热敏打印机标签生成（50×50mm，QR + 书名） |
-| `monitor_api.py` | 5.7 KB | 系统监视 API（CPU/内存/WiFi/温度） |
-| `sysmon.sh` | 2.4 KB | 系统监视 Shell 脚本，30s 间隔，1MB 轮转日志 |
-
-### AI 引擎
-
-| 文件 | 说明 |
-|------|------|
-| `voice_web_app.py` | 语音 AI Web 服务 (:8890)：声纹验证 + ASR + LLM 分类 + 管线调度 |
-| `asr_engine.py` | SenseVoice ASR 引擎封装（sherpa-onnx） |
-| `llm_engine.py` | LLM 推理引擎（llama.cpp / DeepSeek API 双引擎 failover） |
-| `pipeline.py` | 语音识别管线：ASR → LLM 提取 → 书库纠正 → 分类输出 |
-| `book_index.py` | 本地书库索引（414 万条书名模糊匹配） |
-| `search_fallback.py` | Serper 联网搜索兜底（书名相关性检查） |
-| `category_rules.py` | 分类关键词规则（LLM 误分类纠正） |
-| `analog_mic.py` | 模拟麦克风录音（RK809 Codec, S32_LE, 16kHz） |
-
-### 部署脚本 (`deploy-scripts/`)
-
-| 文件 | 说明 |
-|------|------|
-| `deploy_full.sh` | 全量部署 |
-| `deploy_20260702.sh` | 增量部署（指定日期版本） |
-| `deploy_label.sh` | 打印标签部署 |
-
-### 开机自启 (`init-scripts/`)
-
-| 文件 | 说明 |
-|------|------|
-| `S98wifi` | WiFi STA 连接管理 |
-| `S99book` | Flask API :9777 |
-| `S99a-voice` | 语音 AI 服务 :8890 |
-| `S99sysmon` | 系统监视 |
-
-### 设备树
-
-| 文件 | 说明 |
-|------|------|
-| `pdm-mic-combined.dts` | PDM 麦克风设备树片段（参考） |
-
-## 依赖
+## 目录结构
 
 ```
-flask opencv-python pyserial sherpa-onnx pypinyin
+1-RK3566-主控/
+├── cpp/                    C++ 主控工程
+│   ├── src/server/         HTTP 服务与路由（book_server，:9777）
+│   ├── src/bridge/         K230 桥接（:9998 / :9997 / :9999 / :9995）
+│   ├── src/data/           SQLite 数据层（5 表、槽位、借阅规则、日志）
+│   ├── src/core/           任务队列、串口（termios）、打印机（CRC-4 / GBK）
+│   ├── src/common/         HTTP 服务器与客户端、配置、日志、JSON 工具
+│   ├── tests/              单元测试与端到端测试
+│   ├── static/             管理页面静态资源
+│   ├── third_party/        nlohmann/json（随项目携带）
+│   ├── CMakeLists.txt
+│   └── toolchain-aarch64.cmake
+├── voice_web_app.py        语音服务（:8890，声纹 / ASR / 分类）
+├── asr_engine.py           SenseVoice ASR 封装（sherpa-onnx）
+├── llm_engine.py           LLM 推理引擎（llama.cpp / DeepSeek API）
+├── pipeline.py             语音识别管线：ASR → 书名提取 → 书库纠正 → 分类
+├── book_index.py           本地书库索引（书名模糊匹配）
+├── search_fallback.py      联网搜索兜底（书名相关性检查）
+├── category_rules.py       分类关键词规则
+├── analog_mic.py           模拟麦克风采集（RK809 Codec，16 kHz）
+├── qr_scanner.py           OV5695 连续扫码服务（独立进程）
+├── screen.html             HDMI 管理员界面（1024×600）
+├── sysmon.sh               系统监视脚本（30 s 间隔，日志轮转）
+├── pdm-mic-combined.dts    PDM 麦克风设备树片段（参考）
+├── init-scripts/           开机自启脚本
+└── deploy-scripts/         部署脚本
 ```
 
-## 关键设计决策
+## 构建
 
-1. **UART 直控** — 所有 STM32 通信通过 UART 直接发送，不经过 MQTT/云端中转
-2. **双引擎 AI** — 有网时优先 DeepSeek API，断网 <300ms 切换本地 Qwen3-0.6B
-3. **V4L2 BUFFERSIZE** — 必须 ≥4，否则连续扫码失败
-4. **SIGTERM 而非 fuser -k** — 正常释放 V4L2 资源，避免摄像头驱动状态损坏
-5. **USB 有源 Hub 供电必须接入** — WiFi TX 高负载时电压跌落会导致 USB 总线挂死
+本机（x86）：
+
+```bash
+cd cpp
+cmake -B build -DCMAKE_BUILD_TYPE=Release .
+cmake --build build -j
+```
+
+交叉编译（aarch64，部署到板端）：
+
+```bash
+cmake -B build-arm64 -DCMAKE_TOOLCHAIN_FILE=toolchain-aarch64.cmake -DCMAKE_BUILD_TYPE=Release .
+cmake --build build-arm64 -j
+```
+
+依赖：CMake ≥ 3.10、支持 C++17 的编译器、SQLite3 开发库。
+
+## 运行
+
+```bash
+./build/book_server      # HTTP 服务，:9777
+./build/k230_bridge      # K230 桥接，:9998 / :9997 / :9999 / :9995
+```
+
+配置项见 `cpp/src/common/config.h`（数据库路径、端口、串口设备等）。
+
+## 测试
+
+```bash
+cd build && ctest --output-on-failure
+```
+
+## 关键设计
+
+1. **HTTP 服务**：每连接一个线程处理请求，路由分发；管理页面静态文件与 JSON 接口同源提供
+2. **SQLite**：WAL 模式 + busy_timeout，写操作经任务队列串行
+3. **任务队列**：三级优先级（借书 > 取书 > 上架）+ 单 worker 串行执行
+4. **串口**：termios raw 模式，UART4（9600）/ UART5（38400）/ UART9（115200）三路
+5. **打印机**：CRC-4 帧校验 + GBK 编码（iconv）
+6. **K230 桥接**：TCP 长连接与短连接混合，板内 IPC 走本地 TCP
+7. **摄像头**：扫码进程独占 V4L2 设备，其余进程经本地 TCP 取结果，避免设备争用
 
 ## 相关文档
 
