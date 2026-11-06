@@ -1,6 +1,6 @@
 #!/bin/sh
 # S99a-voice — 语音 AI 服务（声纹验证 + 语音书名识别 + 声纹注册）
-# :8890 HTTPS — 声纹验证 + 语音书名识别 + 声纹注册
+# :8890（默认 HTTP；VOICE_TLS=1 启用 HTTPS）
 
 PIDFILE=/var/run/voice_app.pid
 LOG=/tmp/voice_app.log
