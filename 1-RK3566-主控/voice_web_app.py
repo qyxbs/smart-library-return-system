@@ -732,7 +732,7 @@ def api_enroll():
 
 @app.route("/api/print", methods=["POST"])
 def api_print():
-    """录入书本到云端 + 触发MQTT打印"""
+    """录入书本到本地主控 API + 触发打印"""
     data = request.json
     title = data.get("title", "").strip()
     category = data.get("category", "其他类")
@@ -741,7 +741,7 @@ def api_print():
     try:
         import requests as req
         resp = req.post(
-            "https://office.jianlifangshyz.site/api/book/add",
+            "http://127.0.0.1:9777/api/book/add",
             json={"author": "管理员", "category": category, "title": title},
             headers={"Content-Type": "application/json"},
             timeout=15
@@ -1146,7 +1146,7 @@ def api_analog_record():
         })
     except Exception as e:
         print(f"[Pipeline] unavailable: {e}, using DeepSeek result directly", flush=True)
-        from book_index_lite import get_index
+        from book_index import get_index
         book = get_index().lookup(title)
         if book:
             title = book.get("title", title)
@@ -1361,4 +1361,7 @@ if __name__ == "__main__":
     print(f"Voice AI Debug Platform starting on port 8890")
     print(f"Voiceprint model: {'LOADED' if vp else 'NOT LOADED (download model first)'}")
     print(f"Voiceprints: {vp['manager'].num_speakers if vp else 0} registered")
-    socketio.run(app, host="0.0.0.0", port=8890, debug=False, allow_unsafe_werkzeug=True, ssl_context=(CERT_FILE, KEY_FILE))
+    # 默认在 loopback 上以 HTTP 提供服务（主控 C++ 代理直连）；设 VOICE_TLS=1 可启用 HTTPS
+    use_tls = os.environ.get("VOICE_TLS", "0") == "1"
+    ssl_ctx = (CERT_FILE, KEY_FILE) if use_tls else None
+    socketio.run(app, host="0.0.0.0", port=8890, debug=False, allow_unsafe_werkzeug=True, ssl_context=ssl_ctx)

@@ -4,7 +4,8 @@
  */
 const app = getApp();
 
-const BASE = 'https://YOUR_SERVER_DOMAIN';  // 替换为你的后端服务器域名
+const apiConfig = require('../config/api');
+const BASE = (apiConfig.default || apiConfig).baseAPI;  // 统一在 config/api.js 配置
 
 /**
  * 发起 HTTP 请求

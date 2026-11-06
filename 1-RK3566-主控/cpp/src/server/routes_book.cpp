@@ -4,6 +4,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cstdio>
+#include <cstdlib>
+
 #include "common/config.h"
 #include "common/http.h"
 #include "common/http_client.h"
@@ -17,6 +20,38 @@
 namespace routes {
 
 using nlohmann::json;
+
+namespace {
+
+// 轻量 token 签名：FNV-1a + 服务端密钥（部署时用 BOOK_TOKEN_SECRET 覆盖）
+uint64_t fnv1a64(const std::string& s, uint64_t h = 1469598103934665603ULL) {
+    for (unsigned char c : s) {
+        h ^= c;
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+const std::string& token_secret() {
+    static const std::string s = [] {
+        const char* env = std::getenv("BOOK_TOKEN_SECRET");
+        return std::string(env && *env ? env : "book-local-secret-change-me");
+    }();
+    return s;
+}
+
+std::string sig_of(const std::string& openid) {
+    char buf[17];
+    std::snprintf(buf, sizeof(buf), "%016llx",
+                  static_cast<unsigned long long>(fnv1a64(openid + "|" + token_secret())));
+    return std::string(buf);
+}
+
+}  // namespace
+
+std::string make_token(const std::string& openid) {
+    return "local_" + openid + "." + sig_of(openid);
+}
 
 std::optional<AuthUser> current_user(const http::Request& req) {
     auto it = req.headers.find("authorization");
@@ -36,7 +71,15 @@ std::optional<AuthUser> current_user(const http::Request& req) {
         return std::nullopt;
     }
 
-    std::string openid = token.substr(prefix.size());
+    // token 形如 local_<openid>.<sig>：校验签名，避免客户端自行构造
+    auto dot = token.rfind('.');
+    if (dot == std::string::npos || dot <= prefix.size()) {
+        return std::nullopt;
+    }
+    std::string openid = token.substr(prefix.size(), dot - prefix.size());
+    if (token.substr(dot + 1) != sig_of(openid)) {
+        return std::nullopt;
+    }
     auto u = db::user_get_by_openid(openid);
     if (!u) {
         return std::nullopt;

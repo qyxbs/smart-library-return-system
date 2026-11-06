@@ -13,14 +13,14 @@
 #
 # 【交叉编译（给板子用）】
 #   cmake .. -DCMAKE_TOOLCHAIN_FILE=../toolchain-aarch64.cmake
-#   （工具链文件后面阶段 6 再写）
+#   交叉编译需要板端的 SQLite 库，见 README「交叉编译」与 scripts/fetch_sysroot.sh
 # =============================================================================
 
 cmake_minimum_required(VERSION 3.16)
 
 project(book_app_cpp
         VERSION 1.0
-        DESCRIPTION "智能图书系统 RK3566 侧 C++ 重构版"
+        DESCRIPTION "RK3566 主控服务（HTTP / SQLite / 桥接）"
         LANGUAGES CXX)
 
 # -----------------------------------------------------------------------------
@@ -68,13 +68,17 @@ add_compile_options(-Wall -Wextra)
 #     链接时报 "file in wrong format"。
 # -----------------------------------------------------------------------------
 if(CMAKE_CROSSCOMPILING)
+    # sysroot 可用 -DBOOK_SYSROOT=... 覆盖；默认取 cpp/sysroot-arm64
+    set(BOOK_SYSROOT "${CMAKE_CURRENT_SOURCE_DIR}/sysroot-arm64"
+        CACHE PATH "aarch64 sysroot（需包含 libsqlite3）")
     set(SQLITE3_ARM64_LIB
-        "${CMAKE_CURRENT_SOURCE_DIR}/sysroot-arm64/lib/aarch64-linux-gnu/libsqlite3.so")
+        "${BOOK_SYSROOT}/lib/aarch64-linux-gnu/libsqlite3.so")
 
     if(NOT EXISTS "${SQLITE3_ARM64_LIB}")
         message(FATAL_ERROR
             "找不到 ARM64 版 SQLite 库：${SQLITE3_ARM64_LIB}\n"
-            "请先从 SDK 镜像提取（见 README 的交叉编译章节）")
+            "请运行 scripts/fetch_sysroot.sh（从板端提取），或用 -DBOOK_SYSROOT=... 指定。\n"
+            "详见 README「交叉编译」一节。")
     endif()
 
     add_library(SQLite::SQLite3 UNKNOWN IMPORTED)
@@ -189,18 +193,6 @@ set_target_properties(book_server PROPERTIES
 # -----------------------------------------------------------------------------
 # 可执行文件 2：k230_bridge（进程 B，K230 桥接）
 # -----------------------------------------------------------------------------
-# 【当前注释掉】
-#   阶段 4 才实现。现在打开会因为源文件不存在而报错。
-# add_executable(k230_bridge
-#     src/bridge/main_bridge.cpp
-#     src/bridge/bridge.cpp
-#     src/bridge/return_flow.cpp
-# )
-# target_link_libraries(k230_bridge PRIVATE book_common)
-
-# -----------------------------------------------------------------------------
-# 可执行文件 2：k230_bridge（进程 B，K230 桥接）
-# -----------------------------------------------------------------------------
 add_executable(k230_bridge
     src/bridge/main_bridge.cpp
     src/bridge/bridge.cpp
@@ -245,3 +237,8 @@ set_target_properties(test_printer PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 add_test(NAME printer_tests COMMAND test_printer)
+
+# 端到端测试：启动真实服务 + curl 走完整业务流程
+add_test(NAME e2e_tests
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/e2e_test.sh
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

@@ -15,6 +15,12 @@ constexpr int BRIDGE_CMD_PORT  = 9995;
 constexpr int K2301_PORT       = 9998;   // K230 #1（扫码板）连进来的端口
                                           // 注意：是 K230 主动连我们，我们被动 accept
 constexpr int K2302_CMD_PORT   = 9999;   // 我们主动连 K230 #2（导航板），给它下发坐标
+
+// K230 #2 的地址（默认本机，部署时可设 K2302_HOST 环境变量）
+inline std::string k2302_host() {
+    const char* env = std::getenv("K2302_HOST");
+    return env && *env ? std::string(env) : "127.0.0.1";
+}
 constexpr int K2302_NOTIFY_PORT = 9997;  // K230 #2 反向通知我们（TRIGGER / DONE）
                                           // 方向同样是 K230#2 主动连我们
 

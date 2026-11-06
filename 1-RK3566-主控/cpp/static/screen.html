@@ -279,7 +279,7 @@ body.login-page{justify-content:center;align-items:center}
     <div class="page" id="page-shelf">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <div style="display:flex;gap:8px">
-          <button id="btn-start-shelve" style="background:var(--green);color:#fff;padding:6px 16px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer" onclick="startAdminShelve()">📥 开始上架</button>
+          <button id="btn-start-shelve" hidden title="当前版本未实现批量上架状态机" style="background:var(--green);color:#fff;padding:6px 16px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer" onclick="startAdminShelve()">📥 开始上架</button>
           <span id="shelve-status" style="font-size:12px;color:var(--muted);padding:4px 0"></span>
         </div>
         <button style="background:var(--border);color:var(--muted);padding:4px 12px;border:none;border-radius:6px;font-size:12px;cursor:pointer" onclick="loadShelf()">刷新</button>
@@ -515,8 +515,13 @@ async function linkSpeakerToToken(speakerName){
       if(me.code===200&&me.data&&me.data.role!==1){
         const uid=me.data.user_id||me.data.id;
         if(uid){
-          await apiSilent('/api/users/promote',{method:'POST',
-            body:JSON.stringify({userId:uid, pin:'123456'})});
+          const autoPin=localStorage.getItem('adminPin')||'';
+          if(autoPin){
+            await apiSilent('/api/users/promote',{method:'POST',
+              body:JSON.stringify({userId:uid, pin:autoPin})});
+          }else{
+            console.warn('未设置管理员 PIN（localStorage.adminPin），跳过自动提权');
+          }
         }
       }
       return true

@@ -1,5 +1,5 @@
 #!/bin/sh
-# S99voice - 语音 AI 服务 (云端 DeepSeek 链)
+# S99a-voice — 语音 AI 服务（声纹验证 + 语音书名识别 + 声纹注册）
 # :8890 HTTPS — 声纹验证 + 语音书名识别 + 声纹注册
 
 PIDFILE=/var/run/voice_app.pid
@@ -7,7 +7,8 @@ LOG=/tmp/voice_app.log
 APP_DIR=/userdata/voice_app
 PYTHON=/userdata/python/bin/python3
 
-export SERPER_API_KEY="a81976e654537d20d473f4be1fe46dfc9ed5bff5"
+# 外部服务密钥通过环境变量或 /usr/local/etc/voice.env 提供，不写入仓库
+[ -f /usr/local/etc/voice.env ] && . /usr/local/etc/voice.env
 export ORT_DISABLE_ARENA=1
 
 start() {

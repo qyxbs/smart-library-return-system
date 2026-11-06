@@ -15,7 +15,7 @@
 
 import re
 from typing import Optional
-from book_index_lite import get_index
+from book_index import get_index
 
 TARGET_CATEGORIES = ["教辅", "文学", "科技", "其他"]
 

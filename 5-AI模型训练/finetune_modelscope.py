@@ -192,4 +192,4 @@ for f in glob.glob(f'{OUTPUT_GGUF}/*.gguf'):
 
 print("\n" + "=" * 50)
 print("完成! 下载 GGUF 文件部署到 RK3566:")
-print(f"  scp {OUTPUT_GGUF}/*.gguf root@192.168.106.26:/userdata/voice_app/models/")
+print(f"  scp {OUTPUT_GGUF}/*.gguf root@<BOARD_IP>:/userdata/voice_app/models/")

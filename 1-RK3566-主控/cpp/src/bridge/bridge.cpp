@@ -14,6 +14,10 @@
 #include <sstream>
 
 #include "common/config.h"
+#include "core/printer.h"
+
+#include <cctype>
+#include <cstdio>
 #include "common/log.h"
 #include "data/db.h"
 
@@ -193,6 +197,12 @@ void K230Bridge::run_notify_server() {
         std::string line;
         if (read_line(cfd, line)) {
             LOG_INFO("[桥接] K230#2 通知: ", line);
+            {
+                std::lock_guard<std::mutex> lock(mtx_);
+                status_.last_notify = line;
+            }
+            // TRIGGER：限位触发（还书流程）；DONE / FETCH_DONE：机械动作完成
+            // 当前版本记录通知供上层查询，动作结果由调用方按 DONE 判定
         }
         ::close(cfd);
     }
@@ -251,10 +261,10 @@ void K230Bridge::run_cmd_server() {
             }
         } else if (line.compare(0, 12, "ADMIN_SHELVE") == 0 &&
                    line.find("STATUS") != std::string::npos) {
-            reply = "{\"state\":\"idle\",\"message\":\"批量上架状态机未实现\"}";
+            reply = "{\"state\":\"unsupported\",\"message\":\"批量上架状态机未实现\"}";
         } else if (line.compare(0, 12, "ADMIN_SHELVE") == 0) {
-            reply = "OK";
-            LOG_INFO("[桥接] 收到批量上架请求（状态机简化，仅回 OK）");
+            reply = "ERROR:not_implemented";
+            LOG_WARN("[桥接] 批量上架未实现，返回 not_implemented");
         } else if (line == "STATUS") {
             auto st = status();
             std::ostringstream oss;
@@ -277,7 +287,7 @@ void K230Bridge::run_cmd_server() {
                         reply = "ERROR:bad_coord";
                     } else {
                         std::string nav = send_to_k2302(
-                            std::to_string(y) + "," + std::to_string(x));
+                            "FETCH," + std::to_string(y) + "," + std::to_string(x));
                         reply = nav.empty() ? "ERROR:nav_failed" : "OK:" + nav;
                     }
                 }
@@ -294,11 +304,37 @@ void K230Bridge::run_cmd_server() {
     }
 }
 
-std::string K230Bridge::handle_book_id(const std::string& book_id_str) {
-    // 解析书号（QR 里存的是 book_id）
+std::string K230Bridge::handle_book_id(const std::string& raw) {
+    std::string line = raw;
+
+    // 停止码：结束当前还书/上架循环
+    if (line.rfind("STOP:RETURN", 0) == 0) {
+        LOG_INFO("[桥接] 收到停止码 STOP:RETURN");
+        return "ACK";
+    }
+
+    // 帧格式 BOOK:<book_id>:<CRC4>（也兼容裸 ID）
+    if (line.rfind("BOOK:", 0) == 0) {
+        line = line.substr(5);
+    }
+    std::string id_part = line;
+    auto colon = line.find(':');
+    if (colon != std::string::npos) {
+        id_part = line.substr(0, colon);
+        std::string crc = line.substr(colon + 1);
+        char expect[8];
+        std::snprintf(expect, sizeof(expect), "%04X",
+                      static_cast<unsigned>(core::crc4(id_part)));
+        for (auto& ch : crc) ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+        if (!crc.empty() && crc != expect) {
+            LOG_WARN("[桥接] CRC 校验失败: ", crc, " != ", expect);
+            return "NAK:crc";
+        }
+    }
+
     int64_t book_id = 0;
     try {
-        book_id = std::stoll(book_id_str);
+        book_id = std::stoll(id_part);
     } catch (...) {
         return "ERROR:invalid_id";
     }
@@ -325,7 +361,8 @@ std::string K230Bridge::handle_book_id(const std::string& book_id_str) {
     LOG_INFO("[桥接] 书《", inst->title, "》坐标 ", inst->coord_y,
              " → AprilTag (", y, ",", x, ")");
 
-    std::string nav = send_to_k2302(std::to_string(y) + "," + std::to_string(x));
+    std::string nav = send_to_k2302(
+        "SHELVE," + std::to_string(y) + "," + std::to_string(x));
     if (nav.empty()) {
         return "ERROR:nav_failed";
     }
@@ -350,7 +387,7 @@ std::string K230Bridge::send_to_k2302(const std::string& msg, int timeout_ms) {
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
     addr.sin_port = htons(static_cast<uint16_t>(cfg::K2302_CMD_PORT));
-    ::inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+    ::inet_pton(AF_INET, cfg::k2302_host().c_str(), &addr.sin_addr);
 
     if (::connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
         LOG_WARN("[桥接] 连不上 K230#2（", std::strerror(errno), "）");

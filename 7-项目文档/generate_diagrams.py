@@ -153,7 +153,7 @@ def draw_edge_computing_topology():
     rh = 62
     rect(svg, rx, ry, rw, rh, rx=6, fill="#e3edf8", stroke="#1a5276", stroke_width="2.5")
     title_bar(svg, rx, ry, rw, 26, "RK3566  边缘调度节点  Cortex-A55×4  Linux 6.1", fill="#1a5276", size=12)
-    text(svg, rx+rw/2, ry+40, "Flask API + SQLite  ·  K230 Bridge v2 (TCP+CRC4)  ·  SenseVoice ASR + ERes2Net 声纹", size=10, fill="#2c3e50")
+    text(svg, rx+rw/2, ry+40, "C++ HTTP 服务 + SQLite  ·  K230 Bridge（TCP+CRC4）  ·  SenseVoice ASR + ERes2Net 声纹", size=10, fill="#2c3e50")
     text(svg, rx+rw/2, ry+54, "★ DeepSeek (云端) ⇄ Qwen3-0.6B (本地) 双引擎  ·  任务优先队列  ·  HDMI + 小程序接入", size=10, fill="#2c3e50")
 
     # ── 外设 (RK3566 下方) ──
@@ -260,7 +260,7 @@ def draw_software_stack():
             ("HDMI 触屏 + 语音交互", "Kiosk 模式 · 虚拟键盘 · 声纹鉴权 · ASR"),
         ]),
         ("业务逻辑层", "#ed7d31", [
-            ("Flask API + SQLite", "30+ 端点 · 5 表 WAL · 雪花 ID · Bearer 鉴权"),
+            ("C++ HTTP 服务 + SQLite", "50 条路由 · 5 表 WAL · Bearer 鉴权"),
             ("AI 推理 + 任务队列", "★ DeepSeek ⇄ Qwen3-0.6B 双引擎 · 优先队列 BORROW>RETRIEVE>SHELVE"),
         ]),
         ("中间件服务层", "#8e44ad", [

@@ -40,3 +40,15 @@ package-lock.json
 # Project internal (not for open source)
 CLAUDE.md
 .claude/
+
+# CMake 构建产物
+build/
+build-*/
+CMakeFiles/
+CMakeCache.txt
+
+# sysroot 中必要的预编译库（交叉编译使用）
+!**/sysroot-arm64/**/*.so
+
+# 小程序个人配置
+project.private.config.json

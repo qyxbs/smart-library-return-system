@@ -6,7 +6,7 @@
 
 - 微信小程序原生框架
 - Vant Weapp 组件库
-- 直连 RK3566 Flask API (HTTPS)
+- 直连 RK3566 主控 HTTP 服务
 
 ## 目录结构
 

@@ -33,4 +33,7 @@ struct AuthUser {
 };
 std::optional<AuthUser> current_user(const http::Request& req);
 
+// 生成带签名的登录 token
+std::string make_token(const std::string& openid);
+
 }  // namespace routes

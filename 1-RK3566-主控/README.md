@@ -26,7 +26,7 @@ RK3566 是系统的边缘计算中枢，运行 Linux 6.1，负责业务调度、
 ├── category_rules.py       分类关键词规则
 ├── analog_mic.py           模拟麦克风采集（RK809 Codec，16 kHz）
 ├── qr_scanner.py           OV5695 连续扫码服务（独立进程）
-├── screen.html             HDMI 管理员界面（1024×600）
+├── cpp/static/screen.html  HDMI 管理员界面（1024×600）
 ├── sysmon.sh               系统监视脚本（30 s 间隔，日志轮转）
 ├── pdm-mic-combined.dts    PDM 麦克风设备树片段（参考）
 ├── init-scripts/           开机自启脚本
@@ -70,12 +70,12 @@ cd build && ctest --output-on-failure
 ## 关键设计
 
 1. **HTTP 服务**：每连接一个线程处理请求，路由分发；管理页面静态文件与 JSON 接口同源提供
-2. **SQLite**：WAL 模式 + busy_timeout，写操作经任务队列串行
-3. **任务队列**：三级优先级（借书 > 取书 > 上架）+ 单 worker 串行执行
+2. **SQLite**：WAL 模式 + busy_timeout，数据访问在业务进程内完成
+3. **任务队列**：三级优先级（借书 > 取书 > 上架）+ 单 worker 串行执行（串行化串口动作）
 4. **串口**：termios raw 模式，UART4（9600）/ UART5（38400）/ UART9（115200）三路
 5. **打印机**：CRC-4 帧校验 + GBK 编码（iconv）
 6. **K230 桥接**：TCP 长连接与短连接混合，板内 IPC 走本地 TCP
-7. **摄像头**：扫码进程独占 V4L2 设备，其余进程经本地 TCP 取结果，避免设备争用
+7. **摄像头**：扫码进程独占 V4L2 设备，识别结果经主控 HTTP 接口回传，避免设备争用
 
 ## 相关文档
 

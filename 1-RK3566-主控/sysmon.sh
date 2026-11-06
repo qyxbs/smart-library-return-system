@@ -49,7 +49,7 @@ while true; do
     done
 
     # Services status
-    BOOK_OK=$(check_service "book_app" "/var/run/book_app.pid" "python.*app" && echo 1 || echo 0)
+    BOOK_OK=$(check_service "book_server" "/var/run/book_server.pid" "book_server" && echo 1 || echo 0)
     K230_OK=$(check_service "k230" "/var/run/k230_bridge.pid" "k230_bridge" && echo 1 || echo 0)
     LLAMA_OK=$(pgrep "llama-server" > /dev/null 2>&1 && echo 1 || echo 0)
     VOICE_OK=$(pgrep "voice_web_app" > /dev/null 2>&1 && echo 1 || echo 0)
@@ -67,7 +67,7 @@ while true; do
     log "STATUS wifi=[$WIFI_SSID] ip=[$WIFI_IP] net=$INTERNET book=$BOOK_OK k230=$K230_OK llama=$LLAMA_OK voice=$VOICE_OK ap=$AP_OK mem=${MEM_FREE}/${MEM_TOTAL}kB"
 
     # Alert if anything is down
-    [ "$BOOK_OK" = "0" ] && log "ALERT: book_app DOWN"
+    [ "$BOOK_OK" = "0" ] && log "ALERT: book_server DOWN"
     [ "$K230_OK" = "0" ] && log "ALERT: k230_bridge DOWN"
     [ "$INTERNET" = "0" ] && log "ALERT: No internet"
 

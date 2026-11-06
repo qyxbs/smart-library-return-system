@@ -46,9 +46,9 @@ static void handle_fallback(const http::Request& req, http::Response& resp) {
 
     const std::string voice_prefix = "/api/voice/";
     if (req.path.compare(0, voice_prefix.size(), voice_prefix) == 0) {
-        std::string target = std::string(cfg::VOICE_SERVICE_URL) +
-                             req.path.substr(voice_prefix.size() - 1);  // 保留开头的 /
-        // 上面这句的效果：/api/voice/xxx → http://127.0.0.1:8890/xxx
+        // 语音服务的路由以 /api 开头：/api/voice/xxx → http://127.0.0.1:8890/api/xxx
+        std::string target = std::string(cfg::VOICE_SERVICE_URL) + "/api" +
+                             req.path.substr(voice_prefix.size() - 1);
 
         LOG_INFO("[代理] ", req.method, " ", req.path, " → ", target);
 

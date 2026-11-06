@@ -152,7 +152,7 @@ def is_duplicate(task_id: str) -> bool:
     return False
 
 
-def run_scanner(camera_index: int = 0, api_base: str = DEFAULT_API):
+def run_scanner(camera_index: int = DEFAULT_CAMERA, api_base: str = DEFAULT_API):
     """Main loop: continuous capture with BUFFERSIZE=4 to prevent V4L2 buffer exhaustion."""
     global _running
     import cv2

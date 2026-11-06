@@ -4,6 +4,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cstdlib>
+#include <ctime>
+
 #include "common/config.h"
 #include "common/http.h"
 #include "common/json_util.h"
@@ -31,6 +34,19 @@ int64_t jint(const json& j, const std::string& key, int64_t def = 0) {
     return def;
 }
 
+std::string admin_pin() {
+    const char* env = std::getenv("ADMIN_PIN");
+    if (env && *env) return std::string(env);
+    static const std::string generated = [] {
+        std::srand(static_cast<unsigned>(std::time(nullptr)));
+        std::string p;
+        for (int i = 0; i < 6; ++i) p += static_cast<char>('0' + std::rand() % 10);
+        LOG_WARN("[安全] 未设置 ADMIN_PIN，已生成临时 PIN：", p, "（请在环境变量中固定）");
+        return p;
+    }();
+    return generated;
+}
+
 }  // namespace
 
 void register_user_routes(http::Server& srv) {
@@ -42,9 +58,11 @@ void register_user_routes(http::Server& srv) {
             return;
         }
 
+        // 兼容两种前端：小程序/HMI 发送 {code}，其他客户端可发送 {openid}
         std::string openid = jstr(*body, "openid");
+        if (openid.empty()) openid = jstr(*body, "code");
         if (openid.empty()) {
-            resp.json_error(400, "缺少 openid");
+            resp.json_error(400, "缺少 openid / code");
             return;
         }
 
@@ -65,8 +83,10 @@ void register_user_routes(http::Server& srv) {
                     existing = db::user_get(existing->user_id);
                 }
 
-                json data = json_util::user_to_json(*existing);
-                data["token"] = "local_" + openid;   // 前端存这个，之后每次带上
+                json userj = json_util::user_to_json(*existing);
+                json data = userj;               // 扁平字段：兼容管理端页面
+                data["user"] = userj;            // 小程序读取 data.user
+                data["token"] = make_token(openid);
                 resp.json_ok(data);
             } else {
                 // 新用户：创建
@@ -76,8 +96,10 @@ void register_user_routes(http::Server& srv) {
                     jstr(*body, "avatarUrl", jstr(*body, "avatar_url")),
                     cfg::ROLE_USER);
 
-                json data = json_util::user_to_json(created);
-                data["token"] = "local_" + openid;
+                json userj = json_util::user_to_json(created);
+                json data = userj;
+                data["user"] = userj;
+                data["token"] = make_token(openid);
                 resp.json_ok(data);
             }
         } catch (const std::exception& e) {
@@ -165,9 +187,7 @@ void register_user_routes(http::Server& srv) {
         int64_t user_id = jint(*body, "userId");
         std::string pin = jstr(*body, "pin");
 
-        // PIN 可以从环境变量覆盖，默认 123456
-        const char* env_pin = std::getenv("ADMIN_PIN");
-        std::string correct_pin = env_pin ? env_pin : "123456";
+        std::string correct_pin = admin_pin();
 
         if (pin != correct_pin) {
             resp.json_error(403, "PIN 码错误");
@@ -193,8 +213,7 @@ void register_user_routes(http::Server& srv) {
         }
 
         std::string pin = jstr(*body, "pin");
-        const char* env_pin = std::getenv("ADMIN_PIN");
-        std::string correct_pin = env_pin ? env_pin : "123456";
+        std::string correct_pin = admin_pin();
         if (pin != correct_pin) {
             resp.json_error(403, "PIN 码错误");
             return;
@@ -220,8 +239,7 @@ void register_user_routes(http::Server& srv) {
         }
 
         std::string pin = jstr(*body, "pin");
-        const char* env_pin = std::getenv("ADMIN_PIN");
-        std::string correct_pin = env_pin ? env_pin : "123456";
+        std::string correct_pin = admin_pin();
         if (pin != correct_pin) {
             resp.json_error(403, "PIN 码错误");
             return;

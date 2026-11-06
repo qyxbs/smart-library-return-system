@@ -1,0 +1,10 @@
+# 语音 / 扫码等 Python 辅助服务依赖（C++ 主控不需要）
+flask>=2.0
+flask-cors
+flask-socketio
+sherpa-onnx
+soundfile
+numpy
+requests
+oss2
+dashscope

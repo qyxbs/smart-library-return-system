@@ -1,10 +1,10 @@
 #!/bin/sh
 # S98wifi — Single WiFi STA (simple, stable)
 # Good dongle only: 90:de:80:1a:76:9c
-# Connects to phone hotspot abcd (5GHz)
-
-SSID=abcd
-PSK=123454321
+# 凭据不写入仓库：部署时在 /etc/wifi.conf 提供 SSID / PSK
+[ -f /etc/wifi.conf ] && . /etc/wifi.conf
+SSID=${SSID:-YOUR_WIFI_SSID}
+PSK=${PSK:-YOUR_WIFI_PASSWORD}
 KO=/opt/amp/88x2bu.ko
 
 log() { echo "[wifi] $(date +%H:%M:%S) $*"; }

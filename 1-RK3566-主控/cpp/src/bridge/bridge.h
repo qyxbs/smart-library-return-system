@@ -32,6 +32,7 @@ public:
         int  books_scanned = 0;           // 累计扫到多少本
         std::string last_book;            // 最近一次扫到的书号
         std::string last_result;          // 最近一次处理结果
+        std::string last_notify;          // 最近一次 K230#2 通知（TRIGGER/DONE/FETCH_DONE）
     };
     Status status();
 
