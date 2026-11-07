@@ -8,12 +8,11 @@ project(book_app_cpp
         LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)   # 编译器不支持 17 就直接报错，不要偷偷降级
-set(CMAKE_CXX_EXTENSIONS OFF)         # 不用 GNU 扩展，保持标准 C++（可移植性更好）
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_compile_options(-Wall -Wextra)
 
-#   为什么交叉编译时不能 find_package：
 if(CMAKE_CROSSCOMPILING)
     set(BOOK_SYSROOT "${CMAKE_CURRENT_SOURCE_DIR}/sysroot-arm64"
         CACHE PATH "aarch64 sysroot（需包含 libsqlite3）")
@@ -76,7 +75,7 @@ add_library(book_common STATIC
 )
 
 target_include_directories(book_common PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src         # 这样写 #include "common/log.h" 就能找到
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party # nlohmann/json.hpp（随项目携带，不依赖系统装包）
 )
 
