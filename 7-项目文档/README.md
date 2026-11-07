@@ -38,6 +38,6 @@
 
 **三芯异构**：RK3566 (Linux, AI 推理) + K230 ×2 (RT-Smart, 视觉感知) + STM32 ×4 (RT-Thread, 实时控制)
 
-**语音链路**：本地 SenseVoice ASR + 云端 DeepSeek 提取书名/分类；离线时降级为关键词规则（本地 Qwen3 推理代码保留在 `llm_engine.py`，当前未启用）
+**语音链路**：本地 SenseVoice ASR + 云端 DeepSeek 提取书名/分类；未命中时降级为关键词规则
 
 **分布式控制**：Zigbee 广播 + RS485 总线，7 路步进电机，硬实时毫秒级响应

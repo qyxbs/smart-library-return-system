@@ -19,16 +19,13 @@ RK3566 是系统的边缘计算中枢，运行 Linux 6.1，负责业务调度、
 │   └── toolchain-aarch64.cmake
 ├── voice_web_app.py        语音服务（:8890，声纹 / ASR / 分类）
 ├── asr_engine.py           SenseVoice ASR 封装（sherpa-onnx）
-├── llm_engine.py           LLM 推理引擎（llama.cpp / DeepSeek API）
 ├── pipeline.py             语音识别管线：ASR → 书名提取 → 书库纠正 → 分类
 ├── book_index.py           本地书库索引（书名模糊匹配）
-├── search_fallback.py      联网搜索兜底（书名相关性检查）
 ├── category_rules.py       分类关键词规则
 ├── analog_mic.py           模拟麦克风采集（RK809 Codec，16 kHz）
 ├── qr_scanner.py           OV5695 连续扫码服务（独立进程）
 ├── cpp/static/screen.html  HDMI 管理员界面（1024×600）
 ├── sysmon.sh               系统监视脚本（30 s 间隔，日志轮转）
-├── pdm-mic-combined.dts    PDM 麦克风设备树片段（参考）
 ├── init-scripts/           开机自启脚本
 └── deploy-scripts/         部署脚本
 ```
