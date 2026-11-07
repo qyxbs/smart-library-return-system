@@ -1,6 +1,4 @@
-// =============================================================================
 // routes_task.cpp —— 二维码任务 / 扫码回调 路由
-// =============================================================================
 
 #include <nlohmann/json.hpp>
 
@@ -33,7 +31,6 @@ int64_t jint(const json& j, const std::string& key, int64_t def = 0) {
     return def;
 }
 
-// 任务 → JSON
 json task_to_json(const core::TaskRecord& t) {
     json j;
     j["task_id"]      = t.task_id;
@@ -57,13 +54,11 @@ void execute_task(const core::TaskRecord& t, core::TaskQueue& queue) {
                 return;
             }
 
-            // 先抄坐标（借书会清空 slot_id）
             auto before = db::instance_get(instance_id);
             int coord_y = before ? before->coord_y : 0;
 
             auto inst = db::borrow_instance(instance_id, t.user_id);
 
-            // 机械爪取书
             auto task = queue.enqueue(core::PRIO_BORROW, "borrow", coord_y, 30000);
 
             db::log_create(instance_id, t.user_id, "BORROW",
@@ -78,8 +73,6 @@ void execute_task(const core::TaskRecord& t, core::TaskQueue& queue) {
             core::store().complete(t.task_id, result);
 
         } else if (t.action == "return") {
-            // 还书不针对具体某本（用户手里有什么还什么），
-            // 这里取该用户最近借的那一本
             auto borrowed = db::instance_borrowed_list(t.user_id);
             if (borrowed.empty()) {
                 core::store().fail(t.task_id, "没有借阅中的书");
@@ -113,7 +106,7 @@ void execute_task(const core::TaskRecord& t, core::TaskQueue& queue) {
     }
 }
 
-}  // namespace
+}
 
 void register_task_routes(http::Server& srv, core::TaskQueue& queue) {
 
@@ -136,7 +129,6 @@ void register_task_routes(http::Server& srv, core::TaskQueue& queue) {
             return;
         }
 
-        // payload：把 body 里除 action 之外的都带上
         json payload = json::object();
         if (body->contains("instanceId")) {
             payload["instanceId"] = (*body)["instanceId"];
@@ -196,13 +188,11 @@ void register_task_routes(http::Server& srv, core::TaskQueue& queue) {
             return;
         }
 
-        // 解析二维码内容：{"t":"<task_id>","a":"<action>","ts":...}
         std::string task_id;
         try {
             auto j = json::parse(qr_content);
             task_id = jstr(j, "t");
         } catch (...) {
-            // 【兼容】也可能是纯 task_id（12 位字母数字）
             if (qr_content.size() == 12) {
                 task_id = qr_content;
             }
@@ -213,7 +203,6 @@ void register_task_routes(http::Server& srv, core::TaskQueue& queue) {
             return;
         }
 
-        // 原子认领
         auto claimed = core::store().claim(task_id);
         if (!claimed) {
             resp.json_ok("任务已处理或已过期");
@@ -235,4 +224,4 @@ void register_task_routes(http::Server& srv, core::TaskQueue& queue) {
     LOG_INFO("[路由] 任务路由已注册");
 }
 
-}  // namespace routes
+}

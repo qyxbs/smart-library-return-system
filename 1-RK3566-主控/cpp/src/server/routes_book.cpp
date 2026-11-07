@@ -1,6 +1,4 @@
-// =============================================================================
 // routes_book.cpp —— 书目 / 书本实例 / 书架格子 相关路由
-// =============================================================================
 
 #include <nlohmann/json.hpp>
 
@@ -23,7 +21,6 @@ using nlohmann::json;
 
 namespace {
 
-// 轻量 token 签名：FNV-1a + 服务端密钥（部署时用 BOOK_TOKEN_SECRET 覆盖）
 uint64_t fnv1a64(const std::string& s, uint64_t h = 1469598103934665603ULL) {
     for (unsigned char c : s) {
         h ^= c;
@@ -47,7 +44,7 @@ std::string sig_of(const std::string& openid) {
     return std::string(buf);
 }
 
-}  // namespace
+}
 
 std::string make_token(const std::string& openid) {
     return "local_" + openid + "." + sig_of(openid);
@@ -60,7 +57,6 @@ std::optional<AuthUser> current_user(const http::Request& req) {
     }
 
     std::string token = it->second;
-    // 去掉 "Bearer " 前缀
     const std::string bearer = "Bearer ";
     if (token.compare(0, bearer.size(), bearer) == 0) {
         token = token.substr(bearer.size());
@@ -71,7 +67,6 @@ std::optional<AuthUser> current_user(const http::Request& req) {
         return std::nullopt;
     }
 
-    // token 形如 local_<openid>.<sig>：校验签名，避免客户端自行构造
     auto dot = token.rfind('.');
     if (dot == std::string::npos || dot <= prefix.size()) {
         return std::nullopt;
@@ -107,7 +102,6 @@ bool require_admin(const http::Request& req, http::Response& resp) {
 
 namespace {
 
-// 取字符串字段（不存在或类型不对就返回默认值）
 std::string jstr(const json& j, const std::string& key, const std::string& def = "") {
     if (!j.contains(key) || !j[key].is_string()) return def;
     return j[key].get<std::string>();
@@ -139,14 +133,13 @@ std::string trim(const std::string& s) {
     return s.substr(b, e - b + 1);
 }
 
-// 把异常转成统一的错误响应
 void handle_error(const std::exception& e, http::Response& resp,
                   const std::string& where) {
     LOG_WARN("[API] ", where, " 失败: ", e.what());
     resp.json_error(400, e.what());
 }
 
-}  // namespace
+}
 
 void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
 
@@ -167,7 +160,6 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
             return;
         }
 
-        // ---- 分类为空时自动分类 ----
         if (category.empty()) {
             json classify_req;
             classify_req["title"] = title;
@@ -182,7 +174,6 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
                         category = cr["category"].get<std::string>();
                     }
                 } catch (...) {
-                    // 解析失败就走默认分类
                 }
             }
             if (category.empty()) {
@@ -192,16 +183,12 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
         }
 
         try {
-            // ---- 创建书目 ----
             auto book = db::book_create(title, category);
 
-            // ---- 打印标签 ----
             bool printed = core::print_label(std::to_string(book.id), title);
 
-            // ---- 创建实例（待贴标）----
             auto inst = db::instance_create(book.id, 0, 0, cfg::ST_PENDING_STICKER);
 
-            // ---- 写日志 ----
             db::log_create(inst.instance_id, 0, "PRINT",
                            "录入《" + title + "》 分类:" + category, 1);
 
@@ -247,9 +234,8 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
         int size = static_cast<int>(jint(b, "size", 20));
         if (page < 1) page = 1;
         if (size < 1) size = 20;
-        if (size > 200) size = 200;   // 防止一次拉太多
+        if (size > 200) size = 200;
 
-        // status 可能是数字、字符串数字、逗号分隔、或 "overdue"
         std::string status_filter;
         if (b.contains("status")) {
             if (b["status"].is_string()) {
@@ -320,20 +306,17 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
         }
 
         try {
-            // ---- 查分类 ----
             auto book = db::book_get(book_id);
             if (!book) {
                 resp.json_error(404, "书目不存在");
                 return;
             }
 
-            // ---- 分配格子 ----
             auto alloc = db::scan_allocate(book_id, book->category, cfg::ST_ON_SHELF);
 
             auto task = queue.enqueue(core::PRIO_SHELVE, "shelve",
                                       alloc.coord_y, 30000);
 
-            // ---- 写日志 ----
             db::log_create(alloc.instance_id, 0, "SHELVE",
                            "扫码入库《" + book->title + "》→ " + alloc.remark, 1);
 
@@ -384,10 +367,8 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
             }
             int coord_y = before->coord_y;
 
-            // 数据库操作（含全部规则校验）
             auto inst = db::borrow_instance(instance_id, user_id);
 
-            // 机械爪取书
             auto task = queue.enqueue(core::PRIO_BORROW, "borrow", coord_y, 30000);
 
             db::log_create(instance_id, user_id, "BORROW",
@@ -425,7 +406,6 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
         try {
             auto result = db::return_instance(instance_id);
 
-            // 逾期自动累加罚款
             if (result.fine > 0) {
                 auto inst = db::instance_get(instance_id);
                 if (inst && inst->borrower_id > 0) {
@@ -527,7 +507,6 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
             int coord_y = inst->coord_y;
             auto task = queue.enqueue(core::PRIO_RETRIEVE, "retrieve", coord_y, 30000);
 
-            // 取走后释放格子、状态改为待贴标
             db::slot_release(inst->slot_id);
             db::InstanceUpdate upd;
             upd.slot_id = static_cast<int64_t>(0);
@@ -566,7 +545,6 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
                 return;
             }
 
-            // 释放格子 + 状态回到待贴标
             if (inst->slot_id != 0) {
                 db::slot_release(inst->slot_id);
             }
@@ -659,7 +637,6 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
         }
     });
 
-    // GET /api/storage-slot/list —— 16 个格子的实时状态
     srv.get("/api/storage-slot/list", [](const http::Request&, http::Response& resp) {
         try {
             auto slots = db::slot_list();
@@ -669,7 +646,6 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
         }
     });
 
-    // POST /api/storage-slot/list —— 同上（兼容前端用 POST）
     srv.post("/api/storage-slot/list", [](const http::Request&, http::Response& resp) {
         try {
             auto slots = db::slot_list();
@@ -679,7 +655,6 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
         }
     });
 
-    // GET /api/storage-slot/:id
     srv.get("/api/storage-slot/:id",
             [](const http::Request& req, http::Response& resp) {
         int64_t id = req.path_int("id");
@@ -691,7 +666,6 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
         resp.json_ok(json_util::slot_to_json(*slot));
     });
 
-    // PUT /api/storage-slot/:id（管理员）
     srv.put("/api/storage-slot/:id",
             [](const http::Request& req, http::Response& resp) {
         if (!require_admin(req, resp)) return;
@@ -717,7 +691,6 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
         resp.json_ok(json_util::slot_to_json(*slot));
     });
 
-    // POST /api/storage-slot —— 新建格子（管理员，一般用不到，初始化已建好 16 个）
     srv.post("/api/storage-slot",
              [](const http::Request& req, http::Response& resp) {
         if (!require_admin(req, resp)) return;
@@ -727,4 +700,4 @@ void register_book_routes(http::Server& srv, core::TaskQueue& queue) {
     LOG_INFO("[路由] 书目/实例/槽位路由已注册");
 }
 
-}  // namespace routes
+}

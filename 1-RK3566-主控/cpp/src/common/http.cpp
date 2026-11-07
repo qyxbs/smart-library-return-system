@@ -1,20 +1,18 @@
-// =============================================================================
 // http.cpp —— HTTP 服务器实现
-// =============================================================================
 
 #include "common/http.h"
 
-#include <arpa/inet.h>    // inet_ntop —— 把二进制 IP 转成字符串
-#include <netinet/in.h>   // sockaddr_in —— IPv4 地址结构
-#include <sys/socket.h>   // socket / bind / listen / accept / recv / send / setsockopt
-#include <unistd.h>       // close / read / write
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <cctype>
 #include <cerrno>
-#include <cstring>        // strerror
+#include <cstring>
 #include <sstream>
-#include <thread>         // std::thread
+#include <thread>
 
 #include "common/log.h"
 
@@ -28,7 +26,6 @@ std::string url_decode(const std::string& s) {
         char c = s[i];
 
         if (c == '+') {
-            // 查询串里的 + 代表空格
             out += ' ';
         } else if (c == '%' && i + 2 < s.size()) {
             // %XX：把后面两位十六进制转成一个字节
@@ -42,9 +39,9 @@ std::string url_decode(const std::string& s) {
             int lo = hex_val(s[i + 2]);
             if (hi >= 0 && lo >= 0) {
                 out += static_cast<char>((hi << 4) | lo);
-                i += 2;   // 跳过已经处理的两个字符
+                i += 2;
             } else {
-                out += c;  // 格式不对，原样保留
+                out += c;
             }
         } else {
             out += c;
@@ -59,19 +56,17 @@ std::map<std::string, std::string> parse_query(const std::string& query) {
 
     size_t start = 0;
     while (start < query.size()) {
-        // 找下一个 & 的位置
         size_t amp = query.find('&', start);
         std::string pair = (amp == std::string::npos)
                                ? query.substr(start)
                                : query.substr(start, amp - start);
 
-        // 拆成 key=value
         size_t eq = pair.find('=');
         if (eq != std::string::npos) {
             std::string key = url_decode(pair.substr(0, eq));
             std::string val = url_decode(pair.substr(eq + 1));
             if (!key.empty()) {
-                out[key] = val;   // 同名参数后者覆盖前者
+                out[key] = val;
             }
         } else if (!pair.empty()) {
             out[url_decode(pair)] = "";
@@ -94,7 +89,7 @@ int64_t Request::path_int(const std::string& key, int64_t def) const {
     try {
         return std::stoll(it->second);
     } catch (...) {
-        return def;   // 不是合法数字就用默认值
+        return def;
     }
 }
 
@@ -105,7 +100,6 @@ std::optional<nlohmann::json> Request::json() const {
     try {
         return nlohmann::json::parse(body);
     } catch (const std::exception&) {
-        // 正文不是合法 JSON
         return std::nullopt;
     }
 }
@@ -114,7 +108,7 @@ void Response::json_ok(const nlohmann::json& data) {
     nlohmann::json j;
     j["code"] = 200;
     j["data"] = data;
-    body = j.dump();       // dump() = 把 JSON 对象转成字符串
+    body = j.dump();
     content_type = "application/json; charset=utf-8";
     status = 200;
 }
@@ -142,7 +136,6 @@ void Response::html(const std::string& s, int code) {
 
 namespace {
 
-// 把 "/api/book/add" 切成 {"api","book","add"}
 std::vector<std::string> split_path(const std::string& path) {
     std::vector<std::string> out;
     std::string cur;
@@ -160,7 +153,7 @@ std::vector<std::string> split_path(const std::string& path) {
     return out;
 }
 
-}  // namespace
+}
 
 void Server::get(const std::string& path, Handler h) {
     routes_.push_back({"GET", split_path(path), std::move(h)});
@@ -195,7 +188,6 @@ Server::Handler* Server::find_handler(const std::string& method,
             const std::string& val = req_segs[i];
 
             if (!pat.empty() && pat[0] == ':') {
-                // 参数段：名字是冒号后面的部分
                 tmp[pat.substr(1)] = val;
             } else if (pat != val) {
                 matched = false;
@@ -235,7 +227,7 @@ bool Server::listen(int port, const std::string& bind_addr) {
     addr.sin_family = AF_INET;
     addr.sin_port = htons(static_cast<uint16_t>(port));
     if (bind_addr == "0.0.0.0" || bind_addr.empty()) {
-        addr.sin_addr.s_addr = INADDR_ANY;   // 所有网卡
+        addr.sin_addr.s_addr = INADDR_ANY;
     } else {
         ::inet_pton(AF_INET, bind_addr.c_str(), &addr.sin_addr);
     }
@@ -276,13 +268,12 @@ void Server::run() {
                                  &addr_len);
         if (client_fd < 0) {
             if (errno == EINTR) {
-                continue;   // 被信号打断，重试
+                continue;
             }
             LOG_WARN("[HTTP] accept() 失败: ", std::strerror(errno));
             continue;
         }
 
-        // 把客户端 IP 转成字符串（日志用）
         char ip_buf[INET_ADDRSTRLEN] = {0};
         ::inet_ntop(AF_INET, &client_addr.sin_addr, ip_buf, sizeof(ip_buf));
 
@@ -326,7 +317,6 @@ void Server::handle_client(int client_fd, const std::string& client_ip) {
                 resp.json_error(500, std::string("服务器内部错误: ") + e.what());
             }
         } else if (not_found_) {
-            // 兜底处理（静态文件 / 404）
             try {
                 not_found_(req, resp);
             } catch (const std::exception& e) {
@@ -354,17 +344,15 @@ bool Server::read_request(int fd, Request& req) {
     while (true) {
         ssize_t n = ::recv(fd, tmp, sizeof(tmp), 0);
         if (n <= 0) {
-            return false;   // 连接断开 / 超时 / 出错
+            return false;
         }
         buffer.append(tmp, static_cast<size_t>(n));
 
-        // 找 "\r\n\r\n"
         header_end = buffer.find("\r\n\r\n");
         if (header_end != std::string::npos) {
-            break;   // 头部读完了
+            break;
         }
 
-        // 防御：头部过长直接拒绝（防止恶意请求占内存）
         if (buffer.size() > 64 * 1024) {
             LOG_WARN("[HTTP] 请求头过大，已拒绝");
             return false;
@@ -375,7 +363,6 @@ bool Server::read_request(int fd, Request& req) {
     size_t first_line_end = head.find("\r\n");
     std::string request_line = head.substr(0, first_line_end);
 
-    // 按空格切三段
     size_t sp1 = request_line.find(' ');
     if (sp1 == std::string::npos) {
         return false;
@@ -389,7 +376,6 @@ bool Server::read_request(int fd, Request& req) {
     std::string target = request_line.substr(sp1 + 1, sp2 - sp1 - 1);
     req.version = request_line.substr(sp2 + 1);
 
-    // 把 "/api/book/search?keyword=三体" 拆成 path 和 query
     size_t qpos = target.find('?');
     if (qpos == std::string::npos) {
         req.path = target;
@@ -398,13 +384,13 @@ bool Server::read_request(int fd, Request& req) {
         req.query = target.substr(qpos + 1);
     }
 
-    size_t pos = first_line_end + 2;   // 跳过请求行后面的 \r\n
+    size_t pos = first_line_end + 2;
     while (pos < head.size()) {
         size_t line_end = head.find("\r\n", pos);
 
         std::string line;
         if (line_end == std::string::npos) {
-            line = head.substr(pos);   // 最后一行：取到结尾
+            line = head.substr(pos);
             pos = head.size();
         } else {
             line = head.substr(pos, line_end - pos);
@@ -419,12 +405,10 @@ bool Server::read_request(int fd, Request& req) {
         std::string key = line.substr(0, colon);
         std::string val = line.substr(colon + 1);
 
-        // 去掉值前面的空格
         while (!val.empty() && (val[0] == ' ' || val[0] == '\t')) {
             val.erase(val.begin());
         }
 
-        // 头部键统一转小写（HTTP 头不区分大小写，转小写方便查找）
         std::transform(key.begin(), key.end(), key.begin(),
                        [](unsigned char c) { return std::tolower(c); });
 
@@ -441,20 +425,18 @@ bool Server::read_request(int fd, Request& req) {
         }
     }
 
-    // 已经读到的正文部分（可能和头部一起读进来了）
     std::string body = buffer.substr(header_end + 4);
 
-    // 不够就继续读
     while (body.size() < content_length) {
         ssize_t n = ::recv(fd, tmp, sizeof(tmp), 0);
         if (n <= 0) {
-            break;   // 连接断了，body 不完整（后面 JSON 解析会失败，返回 400）
+            break;
         }
         body.append(tmp, static_cast<size_t>(n));
     }
 
     if (body.size() > content_length) {
-        body.resize(content_length);   // 多读的截掉
+        body.resize(content_length);
     }
     req.body = body;
 
@@ -479,8 +461,8 @@ void Server::write_response(int fd, const Response& resp) {
     oss << "HTTP/1.1 " << resp.status << " " << phrase << "\r\n";
     oss << "Content-Type: " << resp.content_type << "\r\n";
     oss << "Content-Length: " << resp.body.size() << "\r\n";
-    oss << "Connection: close\r\n";       // 本实现不支持 keep-alive
-    oss << "Access-Control-Allow-Origin: *\r\n";   // 允许跨域（网页调试用）
+    oss << "Connection: close\r\n";
+    oss << "Access-Control-Allow-Origin: *\r\n";
 
     for (const auto& kv : resp.extra_headers) {
         oss << kv.first << ": " << kv.second << "\r\n";
@@ -507,4 +489,4 @@ void Server::write_response(int fd, const Response& resp) {
     }
 }
 
-}  // namespace http
+}

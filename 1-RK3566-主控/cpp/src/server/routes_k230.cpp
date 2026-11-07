@@ -1,6 +1,4 @@
-// =============================================================================
 // routes_k230.cpp —— K230 相关 + 管理员上架/下架 + 输入法
-// =============================================================================
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -31,7 +29,6 @@ std::string bridge_cmd(const std::string& command, int timeout_ms = 5000) {
     int fd = ::socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) return "";
 
-    // 超时
     timeval tv{};
     tv.tv_sec = timeout_ms / 1000;
     tv.tv_usec = (timeout_ms % 1000) * 1000;
@@ -52,7 +49,6 @@ std::string bridge_cmd(const std::string& command, int timeout_ms = 5000) {
     std::string out = command + "\n";
     ::send(fd, out.data(), out.size(), MSG_NOSIGNAL);
 
-    // 读一行回复
     std::string reply;
     char c;
     while (::recv(fd, &c, 1, 0) > 0) {
@@ -78,7 +74,7 @@ int64_t jint(const json& j, const std::string& key, int64_t def = 0) {
     return def;
 }
 
-}  // namespace
+}
 
 void register_k230_routes(http::Server& srv, core::TaskQueue& queue) {
 
@@ -86,7 +82,6 @@ void register_k230_routes(http::Server& srv, core::TaskQueue& queue) {
         std::string r = bridge_cmd("STATUS", 2000);
 
         if (r.empty()) {
-            // 桥接不在线
             json data;
             data["bridge_online"] = false;
             data["k2301_connected"] = false;
@@ -95,7 +90,6 @@ void register_k230_routes(http::Server& srv, core::TaskQueue& queue) {
             return;
         }
 
-        // 桥接回的是 "k2301=1 scanned=5 last=123456"
         json data;
         data["bridge_online"] = true;
         data["raw"] = r;
@@ -154,8 +148,8 @@ void register_k230_routes(http::Server& srv, core::TaskQueue& queue) {
         data["status"]      = inst->status;
         data["coord_y"]     = inst->coord_y;
         data["remark"]      = inst->remark;
-        data["y"]           = inst->coord_y / 10;   // AprilTag Y
-        data["x"]           = inst->coord_y % 10;   // AprilTag X
+        data["y"]           = inst->coord_y / 10;
+        data["x"]           = inst->coord_y % 10;
 
         resp.json_ok(data);
     });
@@ -183,7 +177,6 @@ void register_k230_routes(http::Server& srv, core::TaskQueue& queue) {
         resp.json_ok(data);
     });
 
-    // POST /api/admin/start-shelve
     srv.post("/api/admin/start-shelve",
              [](const http::Request& req, http::Response& resp) {
         if (!require_admin(req, resp)) return;
@@ -203,7 +196,6 @@ void register_k230_routes(http::Server& srv, core::TaskQueue& queue) {
         }
     });
 
-    // GET /api/admin/shelve-status
     srv.get("/api/admin/shelve-status",
             [](const http::Request&, http::Response& resp) {
         std::string r = bridge_cmd("ADMIN_SHELVE_STATUS", 3000);
@@ -226,7 +218,6 @@ void register_k230_routes(http::Server& srv, core::TaskQueue& queue) {
         }
     });
 
-    // POST /api/book-instance/admin-shelve —— 单本上架
     srv.post("/api/book-instance/admin-shelve",
              [&queue](const http::Request& req, http::Response& resp) {
         if (!require_admin(req, resp)) return;
@@ -273,7 +264,6 @@ void register_k230_routes(http::Server& srv, core::TaskQueue& queue) {
         }
     });
 
-    // POST /api/book-instance/admin-unshelve —— 单本下架
     srv.post("/api/book-instance/admin-unshelve",
              [&queue](const http::Request& req, http::Response& resp) {
         if (!require_admin(req, resp)) return;
@@ -304,7 +294,6 @@ void register_k230_routes(http::Server& srv, core::TaskQueue& queue) {
             int coord_y = inst->coord_y;
             auto task = queue.enqueue(core::PRIO_RETRIEVE, "retrieve", coord_y, 30000);
 
-            // 释放格子 + 状态回到待贴标
             db::slot_release(inst->slot_id);
             db::InstanceUpdate upd;
             upd.slot_id = static_cast<int64_t>(0);
@@ -353,4 +342,4 @@ void register_k230_routes(http::Server& srv, core::TaskQueue& queue) {
     LOG_INFO("[路由] K230/管理员/输入法路由已注册");
 }
 
-}  // namespace routes
+}

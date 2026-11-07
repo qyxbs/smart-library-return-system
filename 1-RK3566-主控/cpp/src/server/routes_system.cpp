@@ -1,11 +1,7 @@
-// =============================================================================
 // routes_system.cpp —— 系统类路由
-// =============================================================================
-// 包括：健康检查、任务队列状态、打印机测试、操作日志、语音代理。
-// =============================================================================
 
 #include <cstdlib>
-#include <fstream>     // 读静态文件
+#include <fstream>
 #include <sstream>
 
 #include <nlohmann/json.hpp>
@@ -40,7 +36,6 @@ int64_t jint(const json& j, const std::string& key, int64_t def = 0) {
     return def;
 }
 
-// 读整个文件到字符串（用于发静态页面）
 bool read_file(const std::string& path, std::string& out) {
     std::ifstream f(path, std::ios::binary);
     if (!f.is_open()) return false;
@@ -51,7 +46,7 @@ bool read_file(const std::string& path, std::string& out) {
     return true;
 }
 
-}  // namespace
+}
 
 void register_system_routes(http::Server& srv, core::TaskQueue& queue) {
 
@@ -151,4 +146,4 @@ void register_system_routes(http::Server& srv, core::TaskQueue& queue) {
     LOG_INFO("[路由] 系统路由已注册");
 }
 
-}  // namespace routes
+}

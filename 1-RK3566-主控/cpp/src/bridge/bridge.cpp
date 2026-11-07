@@ -1,6 +1,4 @@
-// =============================================================================
 // bridge.cpp —— K230 桥接实现
-// =============================================================================
 
 #include "bridge/bridge.h"
 
@@ -25,21 +23,19 @@ namespace bridge {
 
 namespace {
 
-// 从 socket 读一行（以 \n 结尾）
-// 返回 false 表示连接断了
 bool read_line(int fd, std::string& line) {
     line.clear();
     char c;
     while (true) {
         ssize_t n = ::recv(fd, &c, 1, 0);
-        if (n <= 0) return false;         // 断开或出错
-        if (c == '\n') return true;       // 读完整一行
-        if (c != '\r') line += c;         // 忽略 \r（兼容 \r\n）
-        if (line.size() > 4096) return false;  // 防御：异常长的行
+        if (n <= 0) return false;
+        if (c == '\n') return true;
+        if (c != '\r') line += c;
+        if (line.size() > 4096) return false;
     }
 }
 
-}  // namespace
+}
 
 K230Bridge::~K230Bridge() {
     stop();
@@ -52,7 +48,6 @@ int K230Bridge::create_listener(int port) {
         return -1;
     }
 
-    // 允许立刻重新绑定（避免重启时 TIME_WAIT 占用端口）
     int opt = 1;
     ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
@@ -157,7 +152,6 @@ void K230Bridge::run_k2301_server() {
             k2301_client_fd_ = cfd;
         }
 
-        // 长连接：一直读，直到断开
         std::string line;
         while (running_ && read_line(cfd, line)) {
             if (line.empty()) continue;
@@ -201,8 +195,6 @@ void K230Bridge::run_notify_server() {
                 std::lock_guard<std::mutex> lock(mtx_);
                 status_.last_notify = line;
             }
-            // TRIGGER：限位触发（还书流程）；DONE / FETCH_DONE：机械动作完成
-            // 当前版本记录通知供上层查询，动作结果由调用方按 DONE 判定
         }
         ::close(cfd);
     }
@@ -249,15 +241,14 @@ void K230Bridge::run_cmd_server() {
                 LOG_INFO("[桥接] 已向 K230#1 发送 SLEEP");
             }
         } else if (line.compare(0, 11, "CHECK_SHELF") == 0) {
-            // 查取书区有没有书：K230#2 转发给 STM32，回来 FAFA/FBFB
             std::string r = send_to_k2302("CHECK_SHELF", 8000);
             if (r.empty()) {
                 reply = "ERROR:k2302_unreachable";
             } else if (r.find("FAFA") != std::string::npos ||
                        r.find("FA FA") != std::string::npos) {
-                reply = "FAFA";   // 有书
+                reply = "FAFA";
             } else {
-                reply = "FBFB";   // 空
+                reply = "FBFB";
             }
         } else if (line.compare(0, 12, "ADMIN_SHELVE") == 0 &&
                    line.find("STATUS") != std::string::npos) {
@@ -307,13 +298,11 @@ void K230Bridge::run_cmd_server() {
 std::string K230Bridge::handle_book_id(const std::string& raw) {
     std::string line = raw;
 
-    // 停止码：结束当前还书/上架循环
     if (line.rfind("STOP:RETURN", 0) == 0) {
         LOG_INFO("[桥接] 收到停止码 STOP:RETURN");
         return "ACK";
     }
 
-    // 帧格式 BOOK:<book_id>:<CRC4>（也兼容裸 ID）
     if (line.rfind("BOOK:", 0) == 0) {
         line = line.substr(5);
     }
@@ -339,10 +328,8 @@ std::string K230Bridge::handle_book_id(const std::string& raw) {
         return "ERROR:invalid_id";
     }
 
-    // 查这本书"在架"的那一本实体
     auto inst = db::instance_get_on_shelf_by_book_id(book_id);
     if (!inst) {
-        // 也可能二维码里存的是 instance_id
         inst = db::instance_get(book_id);
     }
 
@@ -377,7 +364,6 @@ std::string K230Bridge::send_to_k2302(const std::string& msg, int timeout_ms) {
         return "";
     }
 
-    // 连接超时
     timeval tv{};
     tv.tv_sec = timeout_ms / 1000;
     tv.tv_usec = (timeout_ms % 1000) * 1000;
@@ -415,8 +401,8 @@ bool K230Bridge::coord_to_apriltag(int coord_y, int& y, int& x) {
     if (coord_y < 11 || coord_y > 28) {
         return false;
     }
-    y = coord_y / 10;    // 整除取层号：15/10 = 1
-    x = coord_y % 10;    // 取余取位置：15%10 = 5
+    y = coord_y / 10;
+    x = coord_y % 10;
 
     if (y < 1 || y > 2 || x < 1 || x > 8) {
         return false;
@@ -429,4 +415,4 @@ K230Bridge::Status K230Bridge::status() {
     return status_;
 }
 
-}  // namespace bridge
+}

@@ -1,6 +1,4 @@
-// =============================================================================
 // routes_user.cpp —— 用户 / 鉴权 / 罚款 相关路由
-// =============================================================================
 
 #include <nlohmann/json.hpp>
 
@@ -47,7 +45,7 @@ std::string admin_pin() {
     return generated;
 }
 
-}  // namespace
+}
 
 void register_user_routes(http::Server& srv) {
 
@@ -58,7 +56,6 @@ void register_user_routes(http::Server& srv) {
             return;
         }
 
-        // 兼容两种前端：小程序/HMI 发送 {code}，其他客户端可发送 {openid}
         std::string openid = jstr(*body, "openid");
         if (openid.empty()) openid = jstr(*body, "code");
         if (openid.empty()) {
@@ -67,11 +64,9 @@ void register_user_routes(http::Server& srv) {
         }
 
         try {
-            // 先查有没有这个用户
             auto existing = db::user_get_by_openid(openid);
 
             if (existing) {
-                // 老用户：顺便更新一下昵称/头像（微信那边可能改了）
                 std::string nickname = jstr(*body, "nickname");
                 std::string avatar   = jstr(*body, "avatarUrl", jstr(*body, "avatar_url"));
 
@@ -84,12 +79,11 @@ void register_user_routes(http::Server& srv) {
                 }
 
                 json userj = json_util::user_to_json(*existing);
-                json data = userj;               // 扁平字段：兼容管理端页面
-                data["user"] = userj;            // 小程序读取 data.user
+                json data = userj;
+                data["user"] = userj;
                 data["token"] = make_token(openid);
                 resp.json_ok(data);
             } else {
-                // 新用户：创建
                 auto created = db::user_create(
                     openid,
                     jstr(*body, "nickname", "微信用户"),
@@ -150,7 +144,6 @@ void register_user_routes(http::Server& srv) {
 
         int64_t target_id = req.path_int("id");
 
-        // 只能改自己，或者管理员改别人
         if (me->user_id != target_id && me->role != cfg::ROLE_ADMIN) {
             resp.json_error(403, "无权修改他人信息");
             return;
@@ -166,7 +159,6 @@ void register_user_routes(http::Server& srv) {
         if (body->contains("nickname"))   upd.nickname = jstr(*body, "nickname");
         if (body->contains("avatar_url")) upd.avatar_url = jstr(*body, "avatar_url");
         if (body->contains("avatarUrl"))  upd.avatar_url = jstr(*body, "avatarUrl");
-        // 【注意】这里故意不处理 role 字段
 
         if (!db::user_update(target_id, upd)) {
             resp.json_error(404, "用户不存在或无字段可更新");
@@ -269,7 +261,6 @@ void register_user_routes(http::Server& srv) {
         auto body = req.json();
         int64_t user_id = body ? jint(*body, "userId", me->user_id) : me->user_id;
 
-        // 只能交自己的，除非是管理员
         if (user_id != me->user_id && me->role != cfg::ROLE_ADMIN) {
             resp.json_error(403, "无权操作他人账户");
             return;
@@ -287,7 +278,6 @@ void register_user_routes(http::Server& srv) {
             return;
         }
 
-        // 清零罚款：直接设成 0（用负数抵扣）
         db::user_add_fine(user_id, -fine);
 
         db::log_create(0, user_id, "PAY_FINE",
@@ -305,4 +295,4 @@ void register_user_routes(http::Server& srv) {
     LOG_INFO("[路由] 用户路由已注册");
 }
 
-}  // namespace routes
+}

@@ -1,6 +1,4 @@
-// =============================================================================
 // main_bridge.cpp — K230 桥接进程（:9998 / :9997 / :9999 / :9995）
-// =============================================================================
 
 #include <chrono>
 #include <csignal>
@@ -30,7 +28,6 @@ int main(int argc, char* argv[]) {
     LOG_INFO("智能图书系统 · K230 桥接");
     LOG_INFO("========================================");
 
-    // 数据库（桥接要查书号对应的坐标）
     try {
         db::init();
     } catch (const std::exception& e) {
@@ -38,7 +35,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // 信号处理（Ctrl+C 时优雅退出）
     std::signal(SIGINT, on_signal);
     std::signal(SIGTERM, on_signal);
 

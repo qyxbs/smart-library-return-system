@@ -1,24 +1,4 @@
-// =============================================================================
 // test_db.cpp —— 数据库层自动化测试
-// =============================================================================
-// 【怎么跑】
-//   cd build && make && ./test_db
-//
-// 【测什么】
-//   按"一个用户实际会经历的顺序"测：
-//     建库 → 录书 → 上架（分配格子）→ 借书 → 还书 → 重新上架
-//   外加两个专项：
-//     并发测试（多线程抢格子）—— 验证乐观锁真的有效
-//     规则测试（借书上限、冻结、逾期罚款）
-//
-// 【为什么要有测试而不是靠"跑一遍看看"】
-//   因为很多 bug 只在特定顺序下出现（比如"先删再查"、"两个线程同时抢"）。
-//   手工点页面很难覆盖这些组合，而测试可以每次都跑一遍。
-//
-// 【为什么不引入 gtest 之类的测试框架】
-//   这个项目的测试量不大，用几行宏就够。
-//   引入框架反而增加交叉编译的麻烦（板上不一定有 gtest）。
-// =============================================================================
 
 #include <atomic>
 #include <cstdio>
@@ -31,11 +11,6 @@
 #include "common/config.h"
 #include "data/db.h"
 
-// =============================================================================
-// 极简测试宏
-// =============================================================================
-// 用法：CHECK(条件, "描述")
-// 通过就计数，失败就打出行号和描述。
 static int g_pass = 0;
 static int g_fail = 0;
 
@@ -49,7 +24,6 @@ static int g_fail = 0;
         }                                                                  \
     } while (0)
 
-// 检查"抛异常"：跑 expr，如果抛了 std::exception 就算通过
 #define CHECK_THROWS(expr, msg)                                            \
     do {                                                                   \
         bool thrown = false;                                               \
@@ -61,21 +35,16 @@ static int g_fail = 0;
 #define SECTION(name) std::printf("\n=== %s ===\n", name)
 
 int main() {
-    // -------------------------------------------------------------------------
-    // 准备：用临时数据库，每次跑都是干净的
-    // -------------------------------------------------------------------------
     const char* db_path = "/tmp/test_book_cpp.db";
-    std::remove(db_path);                       // 删掉上次跑剩下的
+    std::remove(db_path);
     std::remove((std::string(db_path) + "-wal").c_str());
     std::remove((std::string(db_path) + "-shm").c_str());
-    setenv("BOOK_DB_PATH", db_path, 1);         // 让 db::init 用它
+    setenv("BOOK_DB_PATH", db_path, 1);
 
     db::init();
     CHECK(!db::current_path().empty(), "数据库路径已设置");
 
-    // =========================================================================
     SECTION("1. 初始槽位");
-    // =========================================================================
     {
         auto slots = db::slot_list();
         CHECK(slots.size() == 16, "应有 16 个书架格子");
@@ -89,9 +58,7 @@ int main() {
         CHECK(all_free, "初始时所有格子都是空的");
     }
 
-    // =========================================================================
     SECTION("2. 书目 CRUD");
-    // =========================================================================
     int64_t book_id = 0;
     {
         auto b = db::book_create("三体", "文学", "", "刘慈欣的科幻小说", "刘慈欣");
@@ -104,7 +71,6 @@ int main() {
         CHECK(got->category == "文学", "分类正确");
         CHECK(got->author == "刘慈欣", "作者正确");
 
-        // 更新
         db::BookUpdate upd;
         upd.title = std::string("三体（修订版）");
         bool ok = db::book_update(book_id, upd);
@@ -114,51 +80,42 @@ int main() {
         CHECK(updated->title == "三体（修订版）", "更新后书名变了");
         CHECK(updated->category == "文学", "没改的字段保持原值");
 
-        // 分页
         auto page = db::book_list(1, 10);
         CHECK(page.total == 1, "总数应为 1");
         CHECK(page.items.size() == 1, "当前页应有 1 条");
         CHECK(page.pages == 1, "总页数应为 1");
 
-        // 搜索
         auto found = db::book_search("三体");
         CHECK(found.size() == 1, "搜索能命中");
         auto not_found = db::book_search("不存在的书名");
         CHECK(not_found.empty(), "搜不到时返回空");
     }
 
-    // =========================================================================
     SECTION("3. 实例与槽位分配");
-    // =========================================================================
     int64_t inst_id = 0;
     {
-        auto inst = db::instance_create(book_id, 0, 0, 2);   // 待上架
+        auto inst = db::instance_create(book_id, 0, 0, 2);
         inst_id = inst.instance_id;
         CHECK(inst.instance_id > 0, "实例 ID 有效");
         CHECK(inst.status == 2, "初始状态=待上架");
         CHECK(inst.title == "三体（修订版）", "JOIN 出了书名");
 
-        // 分配格子
         auto alloc = db::scan_allocate(book_id, "文学", 3);
         CHECK(alloc.slot_id > 0, "拿到了格子");
         CHECK(alloc.coord_x == 1, "文学区在 1 层");
         CHECK(alloc.coord_y >= 15 && alloc.coord_y <= 18, "文学区坐标范围 15-18");
         CHECK(alloc.remark.find("文学区") == 0, "备注是文学区");
 
-        // 实例状态应更新
         auto after = db::instance_get(inst_id);
         CHECK(after->status == 3, "状态改为在架");
         CHECK(after->slot_id == alloc.slot_id, "实例绑定了格子");
         CHECK(after->coord_y == alloc.coord_y, "JOIN 出了坐标");
 
-        // 这个格子现在应被占用
         auto slot = db::slot_get(alloc.slot_id);
         CHECK(slot->is_occupied == 1, "格子标记为已占用");
     }
 
-    // =========================================================================
     SECTION("4. 借书流程");
-    // =========================================================================
     int64_t user_id = 0;
     {
         auto u = db::user_create("openid_test_001", "测试用户", "", 0);
@@ -172,7 +129,6 @@ int main() {
         CHECK(!borrowed.due_date.empty(), "设置了应还日期");
         CHECK(borrowed.slot_id == 0, "槽位已清空");
 
-        // 格子应被释放
         auto slots = db::slot_list();
         int free_count = 0;
         for (const auto& s : slots) {
@@ -182,13 +138,10 @@ int main() {
 
         CHECK(db::user_borrow_count(user_id) == 1, "借书数变成 1");
 
-        // 再借一次应该失败（已经借出了）
         CHECK_THROWS(db::borrow_instance(inst_id, user_id), "重复借同一本书应报错");
     }
 
-    // =========================================================================
     SECTION("5. 还书流程");
-    // =========================================================================
     {
         auto ret = db::return_instance(inst_id);
         CHECK(ret.instance.status == 2, "状态改为待上架");
@@ -200,9 +153,7 @@ int main() {
         CHECK_THROWS(db::return_instance(inst_id), "没借的书不能还");
     }
 
-    // =========================================================================
     SECTION("6. 重新上架");
-    // =========================================================================
     {
         auto re = db::re_shelve_instance(inst_id, "文学");
         CHECK(re.slot_id > 0, "重新分配到格子");
@@ -212,11 +163,8 @@ int main() {
         CHECK(inst->status == 3, "状态回到在架");
     }
 
-    // =========================================================================
     SECTION("7. 借阅规则：上限 / 冻结");
-    // =========================================================================
     {
-        // 造 6 本书，全借走，第 6 本应被拒绝（上限 5）
         std::vector<int64_t> ids;
         for (int i = 0; i < 6; ++i) {
             auto b = db::book_create("测试书" + std::to_string(i), "科技");
@@ -231,7 +179,6 @@ int main() {
                 db::borrow_instance(ids[i], user_id);
                 ++success;
             } catch (const std::exception&) {
-                // 预期：第 6 本超限
             }
         }
         CHECK(success == cfg::MAX_BORROW_COUNT,
@@ -250,16 +197,13 @@ int main() {
         CHECK_THROWS(db::borrow_instance(inst2->instance_id, user_id),
                      "冻结用户借书应被拒");
 
-        // 解冻
         db::UserUpdate uf;
         uf.is_frozen = 0;
         db::user_update(user_id, uf);
         CHECK(!db::user_is_frozen(user_id), "已解冻");
     }
 
-    // =========================================================================
     SECTION("8. 罚款");
-    // =========================================================================
     {
         db::user_add_fine(user_id, 2.5);
         CHECK(db::user_get_fine(user_id) == 2.5, "罚款累加正确");
@@ -268,9 +212,7 @@ int main() {
         CHECK(db::user_get_fine(user_id) == 3.75, "再次累加正确");
     }
 
-    // =========================================================================
     SECTION("9. 操作日志");
-    // =========================================================================
     {
         auto lg = db::log_create(inst_id, user_id, "BORROW", "借阅《三体》", 1, "测试用户");
         CHECK(lg.log_id > 0, "日志写入成功");
@@ -286,23 +228,8 @@ int main() {
         CHECK(by_inst.size() == 1, "按实例查有 1 条");
     }
 
-    // =========================================================================
     SECTION("10. 并发抢格子（乐观锁验证）");
-    // =========================================================================
-    // 【这个测试最关键】
-    //   16 个格子，4 个线程同时抢，每个线程抢 6 次（共 24 次尝试）。
-    //   正确行为：恰好 16 次成功（格子数），8 次失败（没格子了）。
-    //   如果乐观锁有 bug，会出现"两个实例抢到同一个格子"或者"成功次数 > 16"。
     {
-        // 先把所有格子清空（前面的测试占了几个）
-        //
-        // 【为什么要连实例的 slot_id 一起清】
-        //   只调 slot_release() 会把格子的 is_occupied 置 0，但历史上绑定过这个格子的
-        //   实例仍然指着它（book_instance.slot_id 还是老值）。
-        //   之后新书再被分到同一个格子，就会出现"两个实例指向同一格子"——
-        //   这正是刚才测试失败暴露出来的数据不一致。
-        //   真实业务里，释放格子时应该同时解除绑定（borrow_instance 就是这么做的），
-        //   这里模拟的是"把所有书都从书架上拿走"的干净起点。
         for (auto& s : db::slot_list()) {
             if (s.is_occupied) db::slot_release(s.slot_id);
         }
@@ -315,7 +242,6 @@ int main() {
             }
         }
 
-        // 准备 24 本书，每本一个实例
         std::vector<int64_t> book_ids;
         for (int i = 0; i < 24; ++i) {
             auto b = db::book_create("并发书" + std::to_string(i), "其他");
@@ -351,7 +277,6 @@ int main() {
         CHECK(success.load() == 16, "恰好 16 次成功（等于格子数）");
         CHECK(success.load() + failed.load() == 24, "24 次尝试都有结果");
 
-        // 验证：每个格子最多被一个实例占用
         auto final_slots = db::slot_list();
         int occupied = 0;
         for (auto& s : final_slots) {
@@ -362,9 +287,6 @@ int main() {
         CHECK(occupied == 16, "16 个格子全部被占且只占一次");
     }
 
-    // =========================================================================
-    // 结果
-    // =========================================================================
     std::printf("\n========================================\n");
     std::printf("通过 %d 项，失败 %d 项\n", g_pass, g_fail);
     std::printf("========================================\n");

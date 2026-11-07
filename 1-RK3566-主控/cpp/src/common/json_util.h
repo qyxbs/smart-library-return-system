@@ -1,6 +1,4 @@
-// =============================================================================
 // json_util.h —— 数据模型 ↔ JSON 转换
-// =============================================================================
 #pragma once
 
 #include <cstdint>
@@ -12,14 +10,13 @@
 
 namespace json_util {
 
-// JS 能精确表示的最大整数：2^53
 constexpr int64_t JS_SAFE_INTEGER = 9007199254740992LL;
 
 inline nlohmann::json safe_int(int64_t v) {
     if (v > JS_SAFE_INTEGER || v < -JS_SAFE_INTEGER) {
-        return std::to_string(v);   // 转成字符串，例如 "7484681093755318273"
+        return std::to_string(v);
     }
-    return v;                       // 保持数字
+    return v;
 }
 
 inline nlohmann::json book_to_json(const models::BookInfo& b) {
@@ -48,7 +45,6 @@ inline nlohmann::json instance_to_json(const models::BookInstance& x) {
         {"due_date",      x.due_date},
         {"create_time",   x.create_time},
         {"update_time",   x.update_time},
-        // ---- JOIN 字段 ----
         {"title",         x.title},
         {"category",      x.category},
         {"coord_x",       x.coord_x},
@@ -58,7 +54,6 @@ inline nlohmann::json instance_to_json(const models::BookInstance& x) {
     };
 }
 
-// 书架格子
 inline nlohmann::json slot_to_json(const models::StorageSlot& s) {
     return nlohmann::json{
         {"slot_id",     safe_int(s.slot_id)},
@@ -66,13 +61,11 @@ inline nlohmann::json slot_to_json(const models::StorageSlot& s) {
         {"coord_y",     s.coord_y},
         {"is_occupied", s.is_occupied},
         {"remark",      s.remark},
-        // 占着这个格子的书（没书时为空）
         {"instance_id", safe_int(s.instance_id)},
         {"title",       s.title},
     };
 }
 
-// 用户
 inline nlohmann::json user_to_json(const models::User& u) {
     return nlohmann::json{
         {"user_id",      safe_int(u.user_id)},
@@ -88,7 +81,6 @@ inline nlohmann::json user_to_json(const models::User& u) {
     };
 }
 
-// 操作日志
 inline nlohmann::json log_to_json(const models::OperationLog& l) {
     return nlohmann::json{
         {"log_id",        safe_int(l.log_id)},
@@ -120,7 +112,6 @@ inline nlohmann::json page_to_json(const models::PageResult<T>& p,
     };
 }
 
-// 列表序列化（不分页）
 template <typename T, typename ToJsonFn>
 inline nlohmann::json list_to_json(const std::vector<T>& items, ToJsonFn to_json) {
     nlohmann::json arr = nlohmann::json::array();
@@ -130,4 +121,4 @@ inline nlohmann::json list_to_json(const std::vector<T>& items, ToJsonFn to_json
     return arr;
 }
 
-}  // namespace json_util
+}

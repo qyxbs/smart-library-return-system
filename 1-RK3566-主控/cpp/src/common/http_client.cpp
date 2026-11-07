@@ -1,11 +1,9 @@
-// =============================================================================
 // http_client.cpp —— HTTP 客户端实现
-// =============================================================================
 
 #include "common/http_client.h"
 
 #include <arpa/inet.h>
-#include <netdb.h>        // getaddrinfo —— 域名解析（支持 "localhost"）
+#include <netdb.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -32,12 +30,10 @@ bool parse_url(const std::string& url, std::string& host, int& port,
 
     std::string rest = url.substr(prefix.size());
 
-    // 拆 host[:port] 和 path
     size_t slash = rest.find('/');
     std::string hostport = (slash == std::string::npos) ? rest : rest.substr(0, slash);
     path = (slash == std::string::npos) ? "/" : rest.substr(slash);
 
-    // 拆 host 和 port
     size_t colon = hostport.find(':');
     if (colon == std::string::npos) {
         host = hostport;
@@ -54,7 +50,7 @@ bool parse_url(const std::string& url, std::string& host, int& port,
     return !host.empty();
 }
 
-}  // namespace
+}
 
 ClientResponse request(const std::string& method,
                        const std::string& url,
@@ -71,8 +67,8 @@ ClientResponse request(const std::string& method,
     }
 
     addrinfo hints{};
-    hints.ai_family = AF_INET;        // IPv4
-    hints.ai_socktype = SOCK_STREAM;  // TCP
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
 
     addrinfo* result = nullptr;
     int rc = ::getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &result);
@@ -118,7 +114,6 @@ ClientResponse request(const std::string& method,
 
     std::string raw = req.str();
 
-    // 发送（处理短写）
     size_t sent = 0;
     while (sent < raw.size()) {
         ssize_t n = ::send(fd, raw.data() + sent, raw.size() - sent, MSG_NOSIGNAL);
@@ -147,7 +142,6 @@ ClientResponse request(const std::string& method,
     std::string head = data.substr(0, header_end);
     resp.body = data.substr(header_end + 4);
 
-    // 状态行："HTTP/1.1 200 OK"
     size_t line_end = head.find("\r\n");
     std::string status_line = head.substr(0, line_end);
     size_t sp1 = status_line.find(' ');
@@ -163,7 +157,6 @@ ClientResponse request(const std::string& method,
         }
     }
 
-    // 头部
     size_t pos = (line_end == std::string::npos) ? head.size() : line_end + 2;
     while (pos < head.size()) {
         size_t e = head.find("\r\n", pos);
@@ -195,4 +188,4 @@ ClientResponse post_json(const std::string& url, const std::string& json_body,
                    {{"Content-Type", "application/json"}}, timeout_ms);
 }
 
-}  // namespace http
+}

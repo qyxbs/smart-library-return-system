@@ -1,6 +1,4 @@
-// =============================================================================
 // task_store.cpp —— 二维码任务系统实现
-// =============================================================================
 
 #include "core/task_store.h"
 
@@ -22,7 +20,6 @@ namespace {
 
 constexpr int TASK_EXPIRE_SECONDS = 300;
 
-// 清理间隔：60 秒
 constexpr int CLEANUP_INTERVAL_SECONDS = 60;
 
 std::string make_task_id() {
@@ -38,7 +35,6 @@ std::string make_task_id() {
     return std::string(buf);
 }
 
-// 当前时间 + n 秒的字符串
 std::string time_plus_seconds(int seconds) {
     std::time_t t = std::time(nullptr) + seconds;
     std::tm tm_buf{};
@@ -48,11 +44,9 @@ std::string time_plus_seconds(int seconds) {
     return std::string(buf);
 }
 
-}  // namespace
+}
 
 void TaskStore::init() {
-    // task 表已经在 db::init() 的 SCHEMA 里建好了，这里不用做事。
-    // 保留这个函数是为了接口对称（将来如果要做迁移，加在这里）。
     LOG_INFO("[任务] 任务系统就绪");
 }
 
@@ -134,11 +128,10 @@ std::optional<TaskRecord> TaskStore::get(const std::string& task_id) {
         if (it != tasks_.end()) {
             t = it->second;
         } else {
-            // 内存里没有，去数据库找（服务重启后的场景）
             auto loaded = load_from_db(task_id);
             if (!loaded) return std::nullopt;
             t = *loaded;
-            tasks_[task_id] = t;   // 载入内存缓存
+            tasks_[task_id] = t;
         }
     }
 
@@ -172,7 +165,6 @@ std::optional<TaskRecord> TaskStore::claim(const std::string& task_id) {
 
     TaskRecord& t = it->second;
 
-    // 只有 pending 的能认领
     if (t.status != "pending") {
         LOG_WARN("[任务] ", task_id, " 认领失败，当前状态=", t.status);
         return std::nullopt;
@@ -186,7 +178,6 @@ std::optional<TaskRecord> TaskStore::claim(const std::string& task_id) {
         return std::nullopt;
     }
 
-    // 认领：pending → processing
     t.status = "processing";
     persist(t);
 
@@ -232,7 +223,6 @@ std::vector<TaskRecord> TaskStore::list(const std::string& status, int limit) {
         }
     }
 
-    // 按创建时间倒序
     std::sort(out.begin(), out.end(),
               [](const TaskRecord& a, const TaskRecord& b) {
                   return a.created_at > b.created_at;
@@ -254,21 +244,17 @@ void TaskStore::cleanup_once() {
     for (auto it = tasks_.begin(); it != tasks_.end();) {
         TaskRecord& t = it->second;
 
-        // 1. 过期的 pending 任务 → expired
         if (t.status == "pending" && !t.expires_at.empty() && now > t.expires_at) {
             t.status = "expired";
             persist(t);
             ++expired_count;
         }
 
-        // 2. 已完成超过 10 分钟的从内存里删掉（数据库保留）
         bool removable = (t.status == "done" || t.status == "failed" ||
                           t.status == "expired");
         if (removable) {
-            if (now > time_plus_seconds(-900)) {   // 简化：统一清理老的
-                // 这里为了简单，只清理明确完成的
+            if (now > time_plus_seconds(-900)) {
             }
-            // 用一个更直接的判断：完成时间超过 10 分钟
             if (!t.completed_at.empty()) {
                 std::string cutoff = time_plus_seconds(-600);
                 if (now > cutoff && t.completed_at < cutoff) {
@@ -319,7 +305,6 @@ void TaskStore::persist(const TaskRecord& t) {
     try {
         db::task_save(row);
     } catch (const std::exception& e) {
-        // 持久化失败不影响内存里的任务继续工作
         LOG_WARN("[任务] 持久化失败: ", e.what());
     }
 }
@@ -359,4 +344,4 @@ TaskStore& store() {
     return instance;
 }
 
-}  // namespace core
+}

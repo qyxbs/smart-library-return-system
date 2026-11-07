@@ -1,22 +1,20 @@
-// =============================================================================
 // db.cpp — SQLite 数据层（建表、借还、槽位、日志）
-// =============================================================================
 
 #include "data/db.h"
 
 #include <sqlite3.h>
 
 #include <chrono>
-#include <cmath>        // std::round —— 金额四舍五入到分
-#include <cstdlib>      // std::getenv
+#include <cmath>
+#include <cstdlib>
 #include <cstring>
-#include <ctime>        // strptime / mktime / localtime_r / difftime / strftime
-#include <memory>       // std::unique_ptr
+#include <ctime>
+#include <memory>
 #include <mutex>
-#include <stdexcept>    // std::runtime_error
+#include <stdexcept>
 #include <string>
-#include <thread>       // std::this_thread::get_id
-#include <utility>      // std::pair
+#include <thread>
+#include <utility>
 
 #include "common/config.h"
 #include "common/log.h"
@@ -30,19 +28,15 @@ public:
     // explicit 表示不允许隐式转换，必须显式写 Statement s(stmt)
     explicit Statement(sqlite3_stmt* stmt) : stmt_(stmt) {}
 
-    // 析构函数：对象销毁时自动调用
     ~Statement() {
         if (stmt_ != nullptr) {
             sqlite3_finalize(stmt_);
         }
     }
 
-    // 【禁止拷贝】语句对象代表一个唯一的资源，不能复制两份（否则会 double free）
-    // = delete 是 C++11 的写法：明确告诉编译器"这个函数不存在"
     Statement(const Statement&) = delete;
     Statement& operator=(const Statement&) = delete;
 
-    // 【允许移动】把一个语句对象"移交"给另一个变量，原来的置空
     Statement(Statement&& other) noexcept : stmt_(other.stmt_) {
         other.stmt_ = nullptr;
     }
@@ -76,12 +70,11 @@ public:
     bool step() {
         int rc = sqlite3_step(stmt_);
         if (rc == SQLITE_ROW) {
-            return true;      // 有数据
+            return true;
         }
         if (rc == SQLITE_DONE) {
-            return false;     // 正常结束
+            return false;
         }
-        // 其他返回码都是错误
         throw std::runtime_error(std::string("SQL 执行失败: ") + sqlite3_errmsg(
                                      sqlite3_db_handle(stmt_)));
     }
@@ -101,16 +94,14 @@ public:
     std::string col_text(int col) {
         const unsigned char* p = sqlite3_column_text(stmt_, col);
         if (p == nullptr) {
-            return std::string();   // 返回空字符串而不是崩溃
+            return std::string();
         }
-        // 用长度构造：因为文本里可能有 '\0'（虽然业务上不会有，但严谨些）
         int len = sqlite3_column_bytes(stmt_, col);
         return std::string(reinterpret_cast<const char*>(p), static_cast<size_t>(len));
     }
 
-    // 执行写操作并返回影响行数（用于判断"抢格子"是否成功）
     int exec_and_changes() {
-        step();                              // 写操作调一次 step 就执行完了
+        step();
         return sqlite3_changes(sqlite3_db_handle(stmt_));
     }
 
@@ -133,8 +124,6 @@ public:
 
         exec("PRAGMA journal_mode=WAL");
 
-        // busy_timeout：数据库被别的线程/进程锁住时，等多久再报错（毫秒）
-        // 设成 5000 = 等 5 秒。不设的话一遇到锁就立刻返回 SQLITE_BUSY。
         exec("PRAGMA busy_timeout=5000");
 
         // 外键约束默认是关闭的，必须手动打开（SQLite 为了兼容老版本）
@@ -150,18 +139,16 @@ public:
     Connection(const Connection&) = delete;
     Connection& operator=(const Connection&) = delete;
 
-    // 执行一句不关心返回值的 SQL
     void exec(const std::string& sql) {
         char* err = nullptr;
         int rc = sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             std::string msg = err ? err : "未知错误";
-            sqlite3_free(err);   // sqlite3_exec 用 malloc 分配的错误信息，要用 sqlite3_free 释放
+            sqlite3_free(err);
             throw std::runtime_error("SQL 执行失败: " + msg + " (语句: " + sql + ")");
         }
     }
 
-    // 准备一条语句
     Statement prepare(const std::string& sql) {
         sqlite3_stmt* stmt = nullptr;
         int rc = sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr);
@@ -173,7 +160,6 @@ public:
         return Statement(stmt);
     }
 
-    // 取最近一次 INSERT 生成的自增 ID
     int64_t last_insert_rowid() {
         return sqlite3_last_insert_rowid(db_);
     }
@@ -186,11 +172,9 @@ private:
 
 thread_local std::unique_ptr<Connection> g_conn;
 
-// 全局的数据库路径（所有线程共用同一个路径）
 std::string g_db_path;
-std::mutex g_init_mtx;   // 保护 init 的初始化过程
+std::mutex g_init_mtx;
 
-// 取当前线程的连接（没建过就建一个）
 Connection& conn() {
     if (!g_conn) {
         g_conn = std::make_unique<Connection>(g_db_path);
@@ -376,7 +360,6 @@ const SlotInit SLOT_INITS[] = {
     {2, 25, "其他区-1"}, {2, 26, "其他区-2"}, {2, 27, "其他区-3"}, {2, 28, "其他区-4"},
 };
 
-// 分类 → 备注前缀（分配格子时按这个前缀找同分类区域）
 const std::pair<const char*, const char*> CATEGORY_PREFIXES[] = {
     {"教辅", "教辅区"},
     {"文学", "文学区"},
@@ -384,12 +367,11 @@ const std::pair<const char*, const char*> CATEGORY_PREFIXES[] = {
     {"其他", "其他区"},
 };
 
-}  // namespace
+}
 
 void init(const std::string& path) {
     std::lock_guard<std::mutex> lock(g_init_mtx);
 
-    // 决定数据库路径，优先级：参数 > 环境变量 > 默认值
     if (!path.empty()) {
         g_db_path = path;
     } else if (const char* env = std::getenv("BOOK_DB_PATH")) {
@@ -402,7 +384,6 @@ void init(const std::string& path) {
 
     Connection& c = conn();
 
-    // 建表（IF NOT EXISTS，重复执行无害）
     c.exec(SCHEMA_SQL);
     LOG_INFO("[DB] 表结构就绪");
 
@@ -421,7 +402,6 @@ void init(const std::string& path) {
         }
     }
 
-    // 灌初始格子（只在表为空时做，避免重复插入）
     Statement cnt = c.prepare("SELECT COUNT(*) FROM storage_slot");
     cnt.step();
     int64_t slot_count = cnt.col_int64(0);
@@ -460,7 +440,6 @@ int64_t generate_id() {
                          std::chrono::system_clock::now().time_since_epoch()).count();
 
     if (now_ms == last_ms) {
-        // 同一毫秒内：序号 +1；超过 4095 就等到下一毫秒
         seq = (seq + 1) & 0xFFF;
         if (seq == 0) {
             while (now_ms <= last_ms) {
@@ -473,8 +452,6 @@ int64_t generate_id() {
     }
     last_ms = now_ms;
 
-    // 41 位时间戳 + 10 位机器号 + 12 位序号
-    // (1L << 22) 是为了把低 22 位让给机器号和序号
     return (now_ms << 22) | (1L << 12) | seq;
 }
 
@@ -532,14 +509,14 @@ std::optional<BookInfo> book_get(int64_t book_id) {
         "FROM book_info WHERE id=? AND is_deleted=0");
     s.bind(1, book_id);
     if (!s.step()) {
-        return std::nullopt;   // 查不到
+        return std::nullopt;
     }
     return row_to_book(s);
 }
 
 bool book_update(int64_t book_id, const BookUpdate& upd) {
     std::string sql = "UPDATE book_info SET update_time=?";
-    std::vector<std::string> params;   // 按顺序记录要绑定的字符串参数
+    std::vector<std::string> params;
 
     std::string ts = now_str();
 
@@ -550,7 +527,7 @@ bool book_update(int64_t book_id, const BookUpdate& upd) {
     if (upd.author)      { sql += ", author=?";      params.push_back(*upd.author); }
 
     if (params.empty()) {
-        return false;   // 没有要改的字段
+        return false;
     }
 
     sql += " WHERE id=? AND is_deleted=0";
@@ -567,7 +544,6 @@ bool book_update(int64_t book_id, const BookUpdate& upd) {
 }
 
 bool book_delete(int64_t book_id) {
-    // 软删除：只把 is_deleted 置 1，数据还在（以后要恢复或者做审计都用得上）
     Statement s = conn().prepare(
         "UPDATE book_info SET is_deleted=1, update_time=? WHERE id=? AND is_deleted=0");
     s.bind(1, now_str()).bind(2, book_id);
@@ -639,7 +615,6 @@ BookInstance instance_create(int64_t book_id, int64_t user_id,
 
     LOG_INFO("[DB] 新建实例 instance_id=", iid, " book_id=", book_id, " status=", status);
 
-    // 复用 instance_get 把刚插入的记录读回来（这样 JOIN 字段也是全的）
     auto created = instance_get(iid);
     if (!created) {
         throw std::runtime_error("实例创建后读回失败，数据可能不完整");
@@ -648,7 +623,6 @@ BookInstance instance_create(int64_t book_id, int64_t user_id,
 }
 
 std::optional<BookInstance> instance_get(int64_t instance_id) {
-    // 用统一的 INSTANCE_SELECT（带 JOIN），再加 where 条件
     std::string sql = std::string(INSTANCE_SELECT) +
                       "WHERE i.instance_id=? AND i.is_deleted=0";
     Statement s = conn().prepare(sql);
@@ -661,8 +635,8 @@ std::optional<BookInstance> instance_get(int64_t instance_id) {
 
 bool instance_update(int64_t instance_id, const InstanceUpdate& upd) {
     std::string sql = "UPDATE book_instance SET update_time=?";
-    std::vector<std::string> text_params;   // 字符串参数（按出现顺序）
-    std::vector<int64_t>     int_params;    // 整数参数
+    std::vector<std::string> text_params;
+    std::vector<int64_t>     int_params;
 
     std::string ts = now_str();
 
@@ -706,9 +680,9 @@ bool instance_delete(int64_t instance_id) {
 namespace {
 
 struct StatusFilter {
-    std::string sql;             // 形如 " AND ins.status=?" 的片段
-    std::vector<int> int_params; // 对应的整数参数
-    bool need_now = false;       // 是否还需要绑定一个"当前时间"字符串参数
+    std::string sql;
+    std::vector<int> int_params;
+    bool need_now = false;
 };
 
 StatusFilter parse_status_filter(const std::string& filter, const std::string& now) {
@@ -716,18 +690,16 @@ StatusFilter parse_status_filter(const std::string& filter, const std::string& n
     StatusFilter f;
 
     if (filter.empty()) {
-        return f;   // 不过滤
+        return f;
     }
 
     if (filter == "overdue") {
-        // 逾期 = 已借出 + 有应还日期 + 应还日期早于现在
         f.sql = " AND ins.status=? AND ins.due_date!='' AND ins.due_date<?";
         f.int_params.push_back(cfg::ST_BORROWED);
         f.need_now = true;
         return f;
     }
 
-    // 逗号分隔的多状态
     if (filter.find(',') != std::string::npos) {
         std::vector<int> ids;
         std::string cur;
@@ -749,7 +721,6 @@ StatusFilter parse_status_filter(const std::string& filter, const std::string& n
             return f;
         }
 
-        // 拼出 " AND ins.status IN (?,?,?)" —— 有几个状态就几个问号
         f.sql = " AND ins.status IN (";
         for (size_t i = 0; i < ids.size(); ++i) {
             if (i > 0) f.sql += ",";
@@ -760,13 +731,12 @@ StatusFilter parse_status_filter(const std::string& filter, const std::string& n
         return f;
     }
 
-    // 单个状态
     f.sql = " AND ins.status=?";
     f.int_params.push_back(std::stoi(filter));
     return f;
 }
 
-}  // namespace
+}
 
 PageResult<BookInstance> instance_page(int page, int size,
                                        const std::string& status_filter) {
@@ -781,7 +751,6 @@ PageResult<BookInstance> instance_page(int page, int size,
     std::string now = now_str();
     StatusFilter f = parse_status_filter(status_filter, now);
 
-    // ---- 第一步：数总数 ----
     std::string count_sql =
         "SELECT COUNT(*) FROM book_instance ins WHERE ins.is_deleted=0" + f.sql;
     Statement cnt = c.prepare(count_sql);
@@ -798,7 +767,6 @@ PageResult<BookInstance> instance_page(int page, int size,
     result.total = cnt.col_int(0);
     result.pages = models::calc_pages(result.total, size);
 
-    // ---- 第二步：取当前页 ----
     std::string sql = std::string(INSTANCE_SELECT) +
                       "WHERE i.is_deleted=0" + f.sql +
                       " ORDER BY i.create_time DESC LIMIT ? OFFSET ?";
@@ -841,7 +809,6 @@ std::vector<StorageSlot> slot_list() {
     std::vector<StorageSlot> out;
     while (st.step()) {
         StorageSlot sl = row_to_slot(st);
-        // row_to_slot 只读了前 8 列，后两列（instance_id / title）单独取
         sl.instance_id = st.col_int64(8);
         sl.title       = st.col_text(9);
         out.push_back(sl);
@@ -892,8 +859,6 @@ AllocResult scan_allocate(int64_t book_id, const std::string& category, int stat
     Connection& c = conn();
     std::string ts = now_str();
 
-    // ---- 1. 找同分类区域的空格子 ----
-    // 分类 → 备注前缀，例如 "文学" → "文学区"
     const char* prefix = "";
     for (const auto& kv : CATEGORY_PREFIXES) {
         if (category == kv.first) {
@@ -905,7 +870,6 @@ AllocResult scan_allocate(int64_t book_id, const std::string& category, int stat
     std::optional<StorageSlot> slot;
 
     if (prefix[0] != '\0') {
-        // LIKE '文学区%' —— % 是通配符，匹配任意后缀
         Statement s = c.prepare(
             "SELECT slot_id, coord_x, coord_y, is_occupied, remark, "
             "create_time, update_time, is_deleted "
@@ -917,7 +881,6 @@ AllocResult scan_allocate(int64_t book_id, const std::string& category, int stat
         }
     }
 
-    // ---- 2. 同分类满了，溢出到任意空格子 ----
     if (!slot) {
         Statement s = c.prepare(
             "SELECT slot_id, coord_x, coord_y, is_occupied, remark, "
@@ -936,32 +899,26 @@ AllocResult scan_allocate(int64_t book_id, const std::string& category, int stat
     c.exec("BEGIN IMMEDIATE");
 
     try {
-        // ---- 4. 乐观锁抢格子 ----
         Statement claim = c.prepare(
             "UPDATE storage_slot SET is_occupied=1, update_time=? "
             "WHERE slot_id=? AND is_occupied=0");
         claim.bind(1, ts).bind(2, slot->slot_id);
 
         if (claim.exec_and_changes() == 0) {
-            // 影响行数为 0 = 这个格子刚被别人抢走了
             throw std::runtime_error("槽位已被占用，请重试");
         }
 
-        // ---- 5. 找到要上架的那本书本实例 ----
-        // 按 book_id 找最新创建的那一条（同一本书可能有多本实体）
         Statement find = c.prepare(
             "SELECT instance_id FROM book_instance "
             "WHERE book_id=? AND is_deleted=0 ORDER BY create_time DESC LIMIT 1");
         find.bind(1, book_id);
 
         if (!find.step()) {
-            // 找不到实例 → 抛异常 → 事务回滚 → 格子自动恢复
             throw std::runtime_error("未找到书本实例（book_id=" +
                                      std::to_string(book_id) + "）");
         }
         int64_t instance_id = find.col_int64(0);
 
-        // ---- 6. 更新实例：绑定格子 + 改状态 ----
         Statement upd = c.prepare(
             "UPDATE book_instance SET slot_id=?, status=?, update_time=? "
             "WHERE instance_id=?");
@@ -971,7 +928,6 @@ AllocResult scan_allocate(int64_t book_id, const std::string& category, int stat
            .bind(4, instance_id);
         upd.step();
 
-        // ---- 7. 提交 ----
         c.exec("COMMIT");
 
         AllocResult r;
@@ -1063,7 +1019,6 @@ std::optional<BookInstance> instance_get_by_slot(int64_t slot_id) {
 }
 
 std::optional<BookInstance> instance_get_on_shelf_by_book_id(int64_t book_id) {
-    // 扫码时用：二维码里存的是 book_id，要找到"在架"的那一本实体书
     std::string sql = std::string(INSTANCE_SELECT) +
                       "WHERE i.book_id=? AND i.is_deleted=0 AND i.status=? "
                       "ORDER BY i.create_time DESC LIMIT 1";
@@ -1088,7 +1043,6 @@ std::optional<BookInstance> instance_get_by_book_id_any(int64_t book_id) {
 }
 
 std::optional<BookInstance> instance_get_with_slot(int64_t instance_id) {
-    // 和 instance_get 一样的实现（INSTANCE_SELECT 已经 JOIN 了槽位表）
     return instance_get(instance_id);
 }
 
@@ -1121,7 +1075,6 @@ void user_add_fine(int64_t user_id, double amount) {
         return;
     }
     // round 到分：金额是钱，不能有 0.001 元这种精度
-    // 用 (x * 100 + 0.5) / 100 的方式取整到两位小数
     double rounded = std::round(amount * 100.0) / 100.0;
 
     Statement s = conn().prepare(
@@ -1144,11 +1097,10 @@ bool parse_time(const std::string& text, std::time_t& out) {
     if (strptime(text.c_str(), "%Y-%m-%d %H:%M:%S", &tm_buf) == nullptr) {
         return false;
     }
-    out = mktime(&tm_buf);   // mktime 会按本地时区解释 tm
+    out = mktime(&tm_buf);
     return out != static_cast<std::time_t>(-1);
 }
 
-// 当前时间往后 n 天的字符串
 std::string now_plus_days(int days) {
     std::time_t t = std::time(nullptr) + static_cast<std::time_t>(days) * 86400;
     std::tm tm_buf{};
@@ -1158,19 +1110,17 @@ std::string now_plus_days(int days) {
     return std::string(buf);
 }
 
-}  // namespace
+}
 
 BookInstance borrow_instance(int64_t instance_id, int64_t user_id) {
     Connection& c = conn();
 
-    // ---- 1. 查书 ----
     auto found = instance_get(instance_id);
     if (!found) {
         throw std::runtime_error("书本实例不存在");
     }
     BookInstance inst = *found;
 
-    // ---- 2-3. 状态校验 ----
     if (inst.status == cfg::ST_BORROWED) {
         throw std::runtime_error("该书已被借出");
     }
@@ -1178,7 +1128,6 @@ BookInstance borrow_instance(int64_t instance_id, int64_t user_id) {
         throw std::runtime_error("该书尚未上架，无法借阅");
     }
 
-    // ---- 4-6. 用户校验 ----
     if (user_is_frozen(user_id)) {
         throw std::runtime_error("账号已冻结，无法借阅");
     }
@@ -1191,11 +1140,9 @@ BookInstance borrow_instance(int64_t instance_id, int64_t user_id) {
         throw std::runtime_error("有逾期未还的书，请先归还后再借");
     }
 
-    // ---- 7. 算应还日期 ----
     std::string ts = now_str();
     std::string due_date = now_plus_days(cfg::BORROW_DAYS);
 
-    // ---- 8-9. 用事务保证"释放格子"和"改状态"要么都成功要么都不做 ----
     c.exec("BEGIN IMMEDIATE");
     try {
         if (inst.slot_id != 0) {
@@ -1246,7 +1193,6 @@ ReturnResult return_instance(int64_t instance_id) {
         throw std::runtime_error("该书未被借出，无需归还");
     }
 
-    // ---- 算逾期 ----
     int overdue_days = 0;
     double overdue_fine = 0.0;
 
@@ -1254,7 +1200,6 @@ ReturnResult return_instance(int64_t instance_id) {
         std::time_t due = 0;
         if (parse_time(inst.due_date, due)) {
             std::time_t now = std::time(nullptr);
-            // difftime 返回秒数差（double）
             double diff_days = std::difftime(now, due) / 86400.0;
             if (diff_days > 0) {
                 overdue_days = static_cast<int>(diff_days);
@@ -1299,7 +1244,6 @@ AllocResult re_shelve_instance(int64_t instance_id, const std::string& category)
         throw std::runtime_error("该书不是待上架状态");
     }
 
-    // ---- 找同分类空格子，找不到就溢出 ----
     const char* prefix = "";
     for (const auto& kv : CATEGORY_PREFIXES) {
         if (category == kv.first) {
@@ -1397,12 +1341,11 @@ User user_create(const std::string& openid, const std::string& nickname,
 
 namespace {
 
-// user 表统一的 SELECT（避免每处都写一遍列名）
 const char* USER_SELECT =
     "SELECT user_id, openid, nickname, avatar_url, role, is_frozen, fine_balance, "
     "create_time, update_time, is_deleted FROM \"user\" ";
 
-}  // namespace
+}
 
 std::optional<User> user_get(int64_t user_id) {
     Statement s = conn().prepare(std::string(USER_SELECT) +
@@ -1413,7 +1356,6 @@ std::optional<User> user_get(int64_t user_id) {
     }
     User u = row_to_user(s);
 
-    // 顺便统计"当前借了几本书"（前端用户列表要显示）
     u.borrow_count = user_borrow_count(user_id);
     return u;
 }
@@ -1638,4 +1580,4 @@ std::vector<TaskRow> task_list_recent(int limit) {
     return out;
 }
 
-}  // namespace db
+}

@@ -1,21 +1,4 @@
-// =============================================================================
 // test_printer.cpp —— 打印机模块测试
-// =============================================================================
-// 【测什么】
-//   1. CRC-4 算法 —— 和参考值逐条对比
-//      （这是最关键的一项：算错了二维码校验就过不了，K230 会拒读）
-//   2. 二维码内容格式
-//   3. 打印指令序列的关键字节
-//   4. UTF-8 → GBK 转换
-//
-// 【参考值从哪来】
-//   参考值：
-//     BOOK:1                    → 000A
-//     BOOK:7484681093755318273  → 000A
-//     BOOK:5891198275           → 000B
-//     HELLO                     → 000C
-//   和 CLAUDE.md 里记录的联调测试向量一致。
-// =============================================================================
 
 #include <cstdio>
 #include <string>
@@ -35,7 +18,6 @@ static void check(bool cond, const std::string& msg) {
     }
 }
 
-// 把 CRC4 结果格式化成 4 位十六进制
 static std::string crc_hex(const std::string& s) {
     char buf[8];
     std::snprintf(buf, sizeof(buf), "%04X", core::crc4(s));
@@ -45,9 +27,6 @@ static std::string crc_hex(const std::string& s) {
 int main() {
     std::printf("=== 打印机模块测试 ===\n");
 
-    // =========================================================================
-    // 1. CRC-4 与参考值对比
-    // =========================================================================
     {
         check(crc_hex("BOOK:1") == "000A", "CRC4(BOOK:1) = 000A");
         check(crc_hex("BOOK:7484681093755318273") == "000A",
@@ -55,7 +34,6 @@ int main() {
         check(crc_hex("BOOK:5891198275") == "000B", "CRC4(BOOK:5891198275) = 000B");
         check(crc_hex("HELLO") == "000C", "CRC4(HELLO) = 000C");
 
-        // 空字符串的 CRC 应为 0
         check(core::crc4("") == 0, "CRC4(空) = 0");
 
         // 结果必须始终在 0-15 范围内
@@ -67,9 +45,6 @@ int main() {
         check(in_range, "CRC4 结果始终在 4 位范围内（0-15）");
     }
 
-    // =========================================================================
-    // 2. 二维码内容格式
-    // =========================================================================
     {
         std::string qr = core::make_qr_text("5891198275");
         check(qr == "BOOK:5891198275:000B", "QR 内容格式正确: " + qr);
@@ -78,17 +53,12 @@ int main() {
         check(qr2 == "BOOK:1:000A", "短书号的 QR 内容: " + qr2);
     }
 
-    // =========================================================================
-    // 3. 打印指令序列
-    // =========================================================================
     {
         auto cmd = core::build_label("5891198275", "三体");
 
-        // 3.1 开头是初始化指令 1B 40
         check(cmd.size() > 10, "指令序列非空");
         check(cmd[0] == 0x1B && cmd[1] == 0x40, "以初始化指令 1B 40 开头");
 
-        // 3.2 包含标签开始 1A 5B 01
         bool has_label_start = false;
         for (size_t i = 0; i + 2 < cmd.size(); ++i) {
             if (cmd[i] == 0x1A && cmd[i+1] == 0x5B && cmd[i+2] == 0x01) {
@@ -98,7 +68,6 @@ int main() {
         }
         check(has_label_start, "包含标签开始指令 1A 5B 01");
 
-        // 3.3 包含二维码指令 1A 31 00
         bool has_qr = false;
         for (size_t i = 0; i + 2 < cmd.size(); ++i) {
             if (cmd[i] == 0x1A && cmd[i+1] == 0x31 && cmd[i+2] == 0x00) {
@@ -108,7 +77,6 @@ int main() {
         }
         check(has_qr, "包含二维码指令 1A 31 00");
 
-        // 3.4 包含标签结束 + 打印
         bool has_end = false, has_print = false;
         for (size_t i = 0; i + 2 < cmd.size(); ++i) {
             if (cmd[i] == 0x1A && cmd[i+1] == 0x5D && cmd[i+2] == 0x00) has_end = true;
@@ -117,14 +85,12 @@ int main() {
         check(has_end, "包含标签结束指令 1A 5D 00");
         check(has_print, "包含打印指令 1A 4F 00");
 
-        // 3.5 结尾是走纸偏移清零 1B 64 00
         check(cmd.size() >= 3 &&
               cmd[cmd.size()-3] == 0x1B &&
               cmd[cmd.size()-2] == 0x64 &&
               cmd[cmd.size()-1] == 0x00,
               "以走纸偏移清零 1B 64 00 结尾");
 
-        // 3.6 二维码内容确实在里面
         std::string qr_expected = "BOOK:5891198275:000B";
         std::string cmd_str(cmd.begin(), cmd.end());
         check(cmd_str.find(qr_expected) != std::string::npos,
@@ -134,7 +100,6 @@ int main() {
         //     在 "1A 5B 01" 之后第 5-6 字节是宽（小端 400 = 90 01）
         for (size_t i = 0; i + 8 < cmd.size(); ++i) {
             if (cmd[i] == 0x1A && cmd[i+1] == 0x5B && cmd[i+2] == 0x01) {
-                // X(2) Y(2) 之后的 W(2)
                 uint16_t w = static_cast<uint16_t>(cmd[i+7] | (cmd[i+8] << 8));
                 check(w == 400, "标签宽度 = 400 dots (50mm)");
                 break;
@@ -142,9 +107,6 @@ int main() {
         }
     }
 
-    // =========================================================================
-    // 4. UTF-8 → GBK 转换
-    // =========================================================================
     {
         // "三体" 的 UTF-8 是 6 字节，GBK 是 4 字节
         std::string gbk = core::utf8_to_gbk("三体");
@@ -156,23 +118,17 @@ int main() {
             check(static_cast<unsigned char>(gbk[2]) >= 0x81, "第二个字也是双字节");
         }
 
-        // ASCII 内容转换后不变
         check(core::utf8_to_gbk("ABC") == "ABC", "纯 ASCII 转换后不变");
 
-        // 空字符串
         check(core::utf8_to_gbk("").empty(), "空字符串转换结果为空");
     }
 
-    // =========================================================================
-    // 5. 长书名不应崩
-    // =========================================================================
     {
         std::string long_title(100, 'A');
         auto cmd = core::build_label("1", long_title);
         // 固定开销约 79 字节（初始化 + 标签开始 + QR + 结束），加上 100 字节书名
         check(cmd.size() > 150, "长书名能正常构建指令（约 179 字节）");
 
-        // 书名内容确实在指令里
         std::string cmd_str(cmd.begin(), cmd.end());
         check(cmd_str.find(long_title) != std::string::npos, "长书名的内容被写进指令");
     }

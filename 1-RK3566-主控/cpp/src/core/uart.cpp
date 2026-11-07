@@ -1,16 +1,14 @@
-// =============================================================================
 // uart.cpp —— 串口通信实现
-// =============================================================================
 
 #include "core/uart.h"
 
-#include <fcntl.h>      // open / O_RDWR / O_NOCTTY
-#include <termios.h>    // termios / cfsetispeed / tcsetattr
-#include <unistd.h>     // read / write / close
-#include <sys/select.h> // select —— 带超时的读
+#include <fcntl.h>
+#include <termios.h>
+#include <unistd.h>
+#include <sys/select.h>
 
 #include <cerrno>
-#include <cstdio>     // std::snprintf
+#include <cstdio>
 #include <cstring>
 #include <chrono>
 #include <thread>
@@ -59,30 +57,23 @@ bool Uart::open(const std::string& dev, int baud) {
 
     ::cfmakeraw(&tty);
 
-    // 波特率（输入和输出分开设，通常相同）
     ::cfsetispeed(&tty, baud_to_speed(baud));
     ::cfsetospeed(&tty, baud_to_speed(baud));
 
-    tty.c_cflag &= ~static_cast<tcflag_t>(CSIZE);   // 先清掉数据位设置
+    tty.c_cflag &= ~static_cast<tcflag_t>(CSIZE);
     tty.c_cflag |= CS8 | CLOCAL | CREAD;
 
-    // 无校验（PARENB=奇偶校验使能，PARODD=奇校验）
     tty.c_cflag &= ~static_cast<tcflag_t>(PARENB);
 
-    // 1 位停止位（CSTOPB=2 位停止位）
     tty.c_cflag &= ~static_cast<tcflag_t>(CSTOPB);
 
     tty.c_cflag &= ~static_cast<tcflag_t>(CRTSCTS);
 
-    // 关闭软件流控（XON/XOFF）
     tty.c_iflag &= ~static_cast<tcflag_t>(IXON | IXOFF | IXANY);
 
-    // 读超时设置：VMIN=0 + VTIME=1 表示"最多等 0.1 秒"
-    // （我们主要用 select 做超时，这里给个兜底值）
     tty.c_cc[VMIN] = 0;
     tty.c_cc[VTIME] = 1;
 
-    // 立即生效（TCSANOW）
     if (::tcsetattr(fd_, TCSANOW, &tty) != 0) {
         LOG_ERROR("[UART] tcsetattr 失败: ", std::strerror(errno));
         ::close(fd_);
@@ -91,7 +82,6 @@ bool Uart::open(const std::string& dev, int baud) {
         return false;
     }
 
-    // 清空输入缓冲区里可能存在的残留数据
     ::tcflush(fd_, TCIOFLUSH);
 
     mock_ = false;
@@ -108,7 +98,6 @@ void Uart::close() {
 
 bool Uart::write_bytes(const uint8_t* data, size_t len) {
     if (mock_) {
-        // 模拟模式：只打日志
         std::string hex;
         char buf[8];
         for (size_t i = 0; i < len; ++i) {
@@ -128,7 +117,7 @@ bool Uart::write_bytes(const uint8_t* data, size_t len) {
     while (sent < len) {
         ssize_t n = ::write(fd_, data + sent, len - sent);
         if (n < 0) {
-            if (errno == EINTR) continue;   // 被信号打断，重试
+            if (errno == EINTR) continue;
             LOG_ERROR("[UART] 写失败 ", dev_, ": ", std::strerror(errno));
             return false;
         }
@@ -146,7 +135,6 @@ bool Uart::write_byte(uint8_t b) {
 
 ssize_t Uart::read_bytes(uint8_t* buf, size_t len, int timeout_ms) {
     if (mock_) {
-        // 模拟模式：等一会儿然后返回 0（表示超时，没有数据）
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         return 0;
     }
@@ -171,7 +159,7 @@ ssize_t Uart::read_bytes(uint8_t* buf, size_t len, int timeout_ms) {
         return -1;
     }
     if (ret == 0) {
-        return 0;   // 超时
+        return 0;
     }
 
     ssize_t n = ::read(fd_, buf, len);
@@ -185,10 +173,10 @@ ssize_t Uart::read_bytes(uint8_t* buf, size_t len, int timeout_ms) {
 
 namespace {
 
-Uart g_uart4;   // STM32 坐标（9600）
-Uart g_uart5;   // STM32 控制（38400）
+Uart g_uart4;
+Uart g_uart5;
 
-}  // namespace
+}
 
 bool init_uart() {
     bool ok4 = g_uart4.open(cfg::UART4_DEV, cfg::UART4_BAUD);
@@ -210,10 +198,8 @@ static bool send_action(uint8_t prefix, int coord_y, const char* name) {
     LOG_INFO("[UART4] ", name, " 坐标=", coord_y,
              " (", (prefix == 0xFA ? "0xFA 放书" : "0xFB 取书"), ")");
 
-    // 给 STM32 处理坐标的时间
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    // 控制字：启动机械爪
     const uint8_t ctrl[4] = {0xFD, 0x88, 0x88, 0xFD};
     if (!g_uart5.write_bytes(ctrl, 4)) {
         LOG_ERROR("[UART] 控制字发送失败");
@@ -232,4 +218,4 @@ bool uart_retrieve(int coord_y) {
     return send_action(0xFB, coord_y, "取书");
 }
 
-}  // namespace core
+}

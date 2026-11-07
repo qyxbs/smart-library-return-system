@@ -1,12 +1,10 @@
-// =============================================================================
 // task_queue.cpp —— 任务队列的实现
-// =============================================================================
 
 #include "core/task_queue.h"
 
 #include <algorithm>
 #include <chrono>
-#include <thread>      // std::thread / std::this_thread::sleep_for
+#include <thread>
 
 #include "common/log.h"
 
@@ -51,14 +49,12 @@ TaskPtr TaskQueue::enqueue(int priority, const std::string& action, int coord_y,
 
     std::unique_lock<std::mutex> lock(mtx_);
 
-    // 分配序号（同优先级排序用）
     task->seq = ++seq_counter_;
     queue_.push(task);
 
     LOG_INFO("[队列] 入队: ", action, " 坐标=", coord_y,
              " 优先级=", priority, " 当前排队=", queue_.size());
 
-    // 叫醒一个 worker（本项目只有一个 worker，但写 notify_one 更贴合语义）
     cv_.notify_one();
 
     bool done = cv_.wait_for(lock, std::chrono::milliseconds(timeout_ms),
@@ -92,7 +88,6 @@ void TaskQueue::worker_loop() {
             auto best = queue_.front();
             size_t best_idx = 0;
 
-            // 复制一份队列来遍历（std::queue 不支持随机访问）
             std::vector<TaskPtr> tmp;
             std::queue<TaskPtr> copy = queue_;
             while (!copy.empty()) {
@@ -101,7 +96,6 @@ void TaskQueue::worker_loop() {
             }
 
             for (size_t i = 0; i < tmp.size(); ++i) {
-                // 优先级数字小的优先；相同的比序号（先来的优先）
                 if (tmp[i]->priority < best->priority ||
                     (tmp[i]->priority == best->priority && tmp[i]->seq < best->seq)) {
                     best = tmp[i];
@@ -109,7 +103,6 @@ void TaskQueue::worker_loop() {
                 }
             }
 
-            // 把选中的任务从队列里删掉（重建队列，跳过那一个）
             std::queue<TaskPtr> newq;
             for (size_t i = 0; i < tmp.size(); ++i) {
                 if (i != best_idx) newq.push(tmp[i]);
@@ -126,7 +119,6 @@ void TaskQueue::worker_loop() {
         bool ok = true;
         std::string message;
 
-        // 复制一份执行器（避免持锁调用）
         Executor ex;
         {
             std::lock_guard<std::mutex> lock(mtx_);
@@ -134,10 +126,8 @@ void TaskQueue::worker_loop() {
         }
 
         if (ex) {
-            // 有注入的执行器 → 用它（生产环境是 UART，测试环境是记录顺序）
             ok = ex(task->action, task->coord_y, message);
         } else {
-            // 没注入 → 用内置模拟（方便早期调试）
             if (task->action == "shelve") {
                 message = "上架指令已发送";
             } else if (task->action == "retrieve") {
@@ -149,8 +139,6 @@ void TaskQueue::worker_loop() {
                 message = "未知动作: " + task->action;
             }
 
-            // 模拟机械爪动作耗时（真实实现里是串口发送 + 等待 STM32 反馈）
-            // 【为什么要模拟】阶段 3 才接真实串口，这里先把并发逻辑跑通。
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
 
@@ -183,7 +171,6 @@ TaskQueue::Status TaskQueue::status() {
     st.current_action = current_action_;
     st.current_coord = current_coord_;
 
-    // 遍历排队任务（复制一份队列再遍历）
     std::queue<TaskPtr> copy = queue_;
     while (!copy.empty()) {
         auto t = copy.front();
@@ -194,4 +181,4 @@ TaskQueue::Status TaskQueue::status() {
     return st;
 }
 
-}  // namespace core
+}

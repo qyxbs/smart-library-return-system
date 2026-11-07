@@ -1,6 +1,4 @@
-// =============================================================================
 // main_server.cpp —— 进程 A：HTTP 服务（book_server）
-// =============================================================================
 
 #include <csignal>
 #include <cstdlib>
@@ -32,7 +30,6 @@ static void on_signal(int sig) {
     }
 }
 
-// 读整个文件（静态页面用）
 static bool read_file_safe(const std::string& path, std::string& out) {
     std::ifstream f(path, std::ios::binary);
     if (!f.is_open()) return false;
@@ -46,7 +43,6 @@ static void handle_fallback(const http::Request& req, http::Response& resp) {
 
     const std::string voice_prefix = "/api/voice/";
     if (req.path.compare(0, voice_prefix.size(), voice_prefix) == 0) {
-        // 语音服务的路由以 /api 开头：/api/voice/xxx → http://127.0.0.1:8890/api/xxx
         std::string target = std::string(cfg::VOICE_SERVICE_URL) + "/api" +
                              req.path.substr(voice_prefix.size() - 1);
 
@@ -81,7 +77,6 @@ static void handle_fallback(const http::Request& req, http::Response& resp) {
             return;
         }
 
-        // 本机开发时，静态目录可能不在这里，试试当前目录
         if (read_file_safe("static/screen.html", html)) {
             resp.html(html);
             return;
@@ -95,7 +90,6 @@ static void handle_fallback(const http::Request& req, http::Response& resp) {
     if (req.path.compare(0, static_prefix.size(), static_prefix) == 0) {
         std::string filename = req.path.substr(static_prefix.size());
 
-        // 防路径穿越
         if (filename.empty() ||
             filename.find("..") != std::string::npos ||
             filename[0] == '/') {
@@ -178,7 +172,6 @@ int main(int argc, char* argv[]) {
             return ok;
         }
         if (action == "borrow") {
-            // 借书 = 从书架上把这本取下来，和 retrieve 用同一个协议
             bool ok = core::uart_retrieve(coord_y);
             message = ok ? "借书指令已发送" : "借书指令发送失败";
             return ok;
@@ -189,7 +182,6 @@ int main(int argc, char* argv[]) {
 
     queue.start();
 
-    // 任务系统（二维码任务）
     core::store().init();
     core::store().start_cleanup();
 
@@ -205,8 +197,8 @@ int main(int argc, char* argv[]) {
     struct sigaction sa {};
     sa.sa_handler = on_signal;
     sigemptyset(&sa.sa_mask);
-    sigaction(SIGINT, &sa, nullptr);    // Ctrl+C
-    sigaction(SIGTERM, &sa, nullptr);   // kill 命令
+    sigaction(SIGINT, &sa, nullptr);
+    sigaction(SIGTERM, &sa, nullptr);
 
     int port = cfg::HTTP_PORT;
     if (const char* env_port = std::getenv("BOOK_HTTP_PORT")) {
@@ -230,8 +222,6 @@ int main(int argc, char* argv[]) {
     LOG_INFO("  数据库  : ", db::current_path());
     LOG_INFO("========================================");
 
-    // 阻塞在这里，直到 stop() 被调用
-    // 【run() 返回后说明收到了退出信号】
     server.run();
 
     LOG_INFO("正在关闭...");
