@@ -4,7 +4,7 @@
 # 【CMake 是什么】
 #   一个"跨平台的构建工具生成器"。你写一份 CMakeLists.txt，
 #   它能生成 Makefile（Linux）、Visual Studio 工程（Windows）等。
-#   比手写 Makefile 的好处：依赖关系自动推导、跨平台、能被 IDE 直接识别。
+#   比直接编写 Makefile 的好处：依赖关系自动推导、跨平台、能被 IDE 直接识别。
 #
 # 【怎么用】
 #   mkdir build && cd build
